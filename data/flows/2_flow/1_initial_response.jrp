@@ -1,0 +1,37 @@
+{
+  "result": {
+    "info": {
+      "counters": {
+        "rpc": {
+          "ledger_entry": {
+          }
+        },
+        "work_queue": {
+        },
+        "subscriptions": {
+          "ledger": 0,
+          "transactions": 0,
+          "transactions_proposed": 0,
+          "manifests": 0,
+          "validations": 0,
+          "account": 0,
+          "accounts_proposed": 0,
+          "books": 0,
+          "book_changes": 0
+        }
+      },
+      "load_factor": 1,
+      "clio_version": "1.0.3+c7c5d88",
+      "validated_ledger": {
+      },
+      "cache": {
+      },
+      "etl": {
+        "is_writer": false,
+        "read_only": false
+      }
+    },
+    "validated": true,
+    "status": "success"
+  }
+}
