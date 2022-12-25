@@ -3,8 +3,6 @@
     "info": {
       "counters": {
         "rpc": {
-          "ledger_entry": {
-          }
         },
         "work_queue": {
         },
@@ -15,7 +13,7 @@
           "manifests": 0,
           "validations": 0,
           "account": 0,
-          "accounts_proposed": 1,
+          "accounts_proposed": 0,
           "books": 0,
           "book_changes": 0
         }
@@ -27,11 +25,10 @@
       "cache": {
       },
       "etl": {
-        "is_writer": false,
-        "read_only": true
+        "read_only": false
       }
     },
-    "validated": true,
-    "status": "success"
-  }
+    "validated": true
+  },
+  "status": "success"
 }

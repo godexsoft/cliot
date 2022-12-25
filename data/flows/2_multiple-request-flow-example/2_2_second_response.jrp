@@ -3,8 +3,6 @@
     "info": {
       "counters": {
         "rpc": {
-          "ledger_entry": {
-          }
         },
         "work_queue": {
         },
@@ -27,11 +25,10 @@
       "cache": {
       },
       "etl": {
-        "is_writer": false,
         "read_only": false
       }
     },
-    "validated": true,
-    "status": "success"
-  }
+    "validated": true
+  },
+  "status": "success"
 }

@@ -1,6 +1,6 @@
 { 
     "method": "server_info", 
     "params": [
-        { }
+        { "ledger_index":"{{ LedgerIndexMax }}" }
     ] 
 }

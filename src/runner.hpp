@@ -10,6 +10,8 @@
 #include <string_view>
 #include <vector>
 
+#include <web.hpp>
+
 // good candidate for CTRE?
 std::string parse_index(std::filesystem::path path) {
     auto name = path.filename().string();
@@ -26,104 +28,23 @@ class Request {
     std::string path_;
 
 public:
-    Request(inja::Environment &env, std::filesystem::path path)
+    Request(inja::Environment &env, std::string const &path)
         : env_{ std::ref(env) }
         , index_{ parse_index(path) }
         , path_{ path } {
     }
+    Request(Request const &) = default;
+    Request(Request &&)      = delete;
 
     std::string index() const {
         return index_;
     }
 
-    // perform request (asio)
-    inja::json perform(inja::json const &store) {
+    template <typename ConnectionManagerType>
+    std::string perform(inja::json const &store, ConnectionManagerType &con_man) {
         auto temp = env_.get().parse_template(path_);
         auto res  = env_.get().render(temp, store);
-        // fmt::print("+ performing req: '{}'\n", res);
-
-        return inja::json::parse(R"({
-  "result": {
-    "info": {
-      "complete_ledgers": "24147251-24182121",
-      "counters": {
-        "rpc": {
-          "ledger_entry": {
-            "started": "1",
-            "finished": "0",
-            "errored": "1",
-            "forwarded": "0",
-            "duration_us": "0"
-          }
-        },
-        "work_queue": {
-          "queued": 2,
-          "queued_duration_us": 62,
-          "current_queue_size": 1,
-          "max_queue_size": 4294967295
-        },
-        "subscriptions": {
-          "ledger": 0,
-          "transactions": 0,
-          "transactions_proposed": 0,
-          "manifests": 0,
-          "validations": 0,
-          "account": 0,
-          "accounts_proposed": 0,
-          "books": 0,
-          "book_changes": 0
-        }
-      },
-      "load_factor": 1,
-      "clio_version": "1.0.3+c7c5d88",
-      "validated_ledger" : {},
-      "cache": {
-        "size": 255488,
-        "is_full": false,
-        "latest_ledger_seq": 24182121,
-        "object_hit_rate": 0,
-        "successor_hit_rate": 1
-      },
-      "etl": {
-        "etl_sources": [
-          {
-            "probing": {
-              "ws": {
-                "validated_range": "N/A",
-                "is_connected": "0",
-                "ip": "127.0.0.1",
-                "ws_port": "6006",
-                "grpc_port": "50051"
-              },
-              "wss": {
-                "validated_range": "N/A",
-                "is_connected": "0",
-                "ip": "127.0.0.1",
-                "ws_port": "6006",
-                "grpc_port": "50051"
-              }
-            }
-          }
-        ],
-        "is_writer": false,
-        "read_only": false
-      }
-    },
-    "validated": true,
-    "status": "success"
-  },
-  "warnings": [
-    {
-      "id": 2001,
-      "message": "This is a clio server. clio only serves validated data. If you want to talk to rippled, include 'ledger_index':'current' in your request"
-    },
-    {
-      "id": 2002,
-      "message": "This server may be out of date"
-    }
-  ]
-}
-)");
+        return con_man.send(std::move(res));
     }
 };
 
@@ -136,13 +57,13 @@ class Response {
     bool is_valid_      = true;
 
 public:
-    Response(inja::Environment &env, std::filesystem::path path)
+    Response(inja::Environment &env, std::string const &path)
         : env_{ std::ref(env) }
         , index_{ parse_index(path) }
         , path_{ path } {
     }
+    Response(Response &&)      = delete;
     Response(Response const &) = default;
-    Response(Response &&)      = default;
 
     void validate(inja::json const &store, inja::json const &incoming) {
         inja::json data = store;
@@ -154,7 +75,9 @@ public:
 
         dovalidate("", expectations, incoming);
         if(not is_valid_)
-            throw std::runtime_error("Failed '" + path_ + "': " + issues_);
+            throw std::runtime_error(fmt::format(
+                "Failed '{}': {}\n\n---\n{}\n---",
+                path_, issues_, incoming.dump(4)));
     }
 
     std::string index() const {
@@ -170,7 +93,12 @@ private:
             for(auto const &expectation : expectations.items()) {
                 auto const &key = expectation.key();
                 if(not incoming.contains(key)) {
-                    add_issue("NO MATCH", std::string{ path } + '.' + key, "Key is not present in the response");
+                    auto const full_path = [&path, &key]() -> std::string {
+                        if(path.empty())
+                            return key;
+                        return path + '.' + key;
+                    }();
+                    add_issue("NO MATCH", full_path, "Key is not present in the response");
 
                 } else {
                     dovalidate(path + (path.empty() ? "" : ".") + key,
@@ -193,46 +121,80 @@ private:
     }
 };
 
+template <typename ConnectionManagerType>
 class FlowRunner {
     std::reference_wrapper<inja::Environment> env_;
+    std::reference_wrapper<inja::json> store_;
+    std::reference_wrapper<ConnectionManagerType> con_man_;
     std::string_view name_;
-    std::vector<Request> requests_;
-    std::vector<Response> responses_;
+    std::queue<Request> requests_;
+    std::queue<Response> responses_;
 
 public:
     FlowRunner(
         inja::Environment &env,
+        inja::json &store,
+        ConnectionManagerType &con_man,
         std::string_view name,
-        std::vector<Request> const &requests,
-        std::vector<Response> const &responses)
+        std::queue<Request> const &requests,
+        std::queue<Response> const &responses)
         : env_{ std::ref(env) }
+        , store_{ std::ref(store) }
+        , con_man_{ std::ref(con_man) }
         , name_{ name }
         , requests_{ requests }
         , responses_{ responses } {
     }
 
-    // run the flow which can throw
     void run() {
         report_running();
-        auto store = env_.get().load_json("./data/environment.json");
 
-        for(auto &req : requests_) {
-            auto result = req.perform(store);
+        while(not requests_.empty()) {
+            auto &req = requests_.front();
 
-            for(auto &resp : responses_) {
-                if(req.index() == resp.index()) {
-                    // we need to wait for second response to arrive if we
-                    // already handled initial result...
-                    resp.validate(store, result);
-                }
+            // expecting at least one response
+            if(responses_.empty())
+                throw std::runtime_error("No more responses left to check.. unbalanced");
+
+            report_request(req.index());
+            auto data = req.perform<ConnectionManagerType>(store_, con_man_);
+            if(responses_.front().index() != req.index())
+                throw std::logic_error("Index of request is not matching index of response");
+
+            while(!responses_.empty()) {
+                auto &resp = responses_.front();
+                if(resp.index() != req.index())
+                    break; // done matching responses
+
+                // TODO: hm, what about multiple messages??
+                report_response(resp.index());
+                resp.validate(store_, inja::json::parse(data));
+                responses_.pop();
             }
+
+            requests_.pop();
         }
     }
 
 private:
-    void report_running() {
+    void
+    report_running() {
         fmt::print(fg(fmt::color::ghost_white), "? | ");
         fmt::print(fg(fmt::color::pale_green) | fmt::emphasis::bold, "RUN FLOW ");
         fmt::print(fg(fmt::color::sky_blue) | fmt::emphasis::bold, "{}\n", name_);
+    }
+
+    void
+    report_request(std::string_view idx) {
+        fmt::print(fg(fmt::color::ghost_white), "? | ");
+        fmt::print(fg(fmt::color::pale_green) | fmt::emphasis::bold, "RUN REQUEST ");
+        fmt::print(fg(fmt::color::sky_blue) | fmt::emphasis::bold, "request {}\n", idx);
+    }
+
+    void
+    report_response(std::string_view idx) {
+        fmt::print(fg(fmt::color::ghost_white), "? | ");
+        fmt::print(fg(fmt::color::pale_green) | fmt::emphasis::bold, "CHECK RESPONSE ");
+        fmt::print(fg(fmt::color::sky_blue) | fmt::emphasis::bold, "response {}\n", idx);
     }
 };

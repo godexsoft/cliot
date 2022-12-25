@@ -93,6 +93,8 @@ int main(int argc, char **argv) try {
     options.add_options()
       ("p,path", "Path to data folder", cxxopts::value<std::string>())
       ("h,help", "Print help message and exit")
+      ("H,host", "Clio server ip address", cxxopts::value<std::string>()->default_value("127.0.0.1"))
+      ("P,port", "The port Clio is running on", cxxopts::value<uint16_t>()->default_value("51233"))
     ;
     options.parse_positional({"path"});
     // clang-format on
@@ -101,8 +103,16 @@ int main(int argc, char **argv) try {
     if(result["help"].as<bool>())
         usage(options.help());
 
-    auto path      = result["path"].as<std::string>();
-    auto scheduler = Scheduler{ env, Crawler{ env, path } };
+    auto path = result["path"].as<std::string>();
+    auto host = result["host"].as<std::string>();
+    auto port = result["port"].as<uint16_t>();
+
+    using connection_manager_t = ConnectionManager<OnDemandConnection>;
+    using scheduler_t          = Scheduler<connection_manager_t>;
+
+    auto con_man   = connection_manager_t{ host, port };
+    auto scheduler = scheduler_t{ env, store_, con_man, Crawler{ env, path } };
+
     scheduler.run();
 
     return EXIT_SUCCESS;

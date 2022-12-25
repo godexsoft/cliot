@@ -4,4 +4,6 @@ target_compile_options(cliot
           -Wextra
           -Wpedantic
           -pedantic
+          -Wno-error=unused-parameter
+          -Wno-unused-parameter # for now
 )

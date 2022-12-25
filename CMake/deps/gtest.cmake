@@ -10,8 +10,9 @@ if(NOT googletest_POPULATED)
   add_subdirectory(${googletest_SOURCE_DIR} ${googletest_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 
-target_link_libraries(cliot_tests PUBLIC gmock_main inja)
-target_include_directories(cliot_tests PRIVATE unittests)
+target_compile_features(cliot_tests PUBLIC cxx_std_20)
+target_link_libraries(cliot_tests PUBLIC gmock_main crablib::crablib inja fmt)
+target_include_directories(cliot_tests PRIVATE unittests src)
 
 enable_testing()
 

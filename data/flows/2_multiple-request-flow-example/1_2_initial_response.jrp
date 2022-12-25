@@ -3,8 +3,6 @@
     "info": {
       "counters": {
         "rpc": {
-          "ledger_entry": {
-          }
         },
         "work_queue": {
         },
@@ -21,17 +19,16 @@
         }
       },
       "load_factor": 1,
-      "clio_version": "1.0.3+c7c5d88",
+      "clio_version": "{{ store($res.result.info.clio_version, "ClioVersion")}}",
       "validated_ledger": {
       },
       "cache": {
       },
       "etl": {
-        "is_writer": true,
         "read_only": false
       }
     },
-    "validated": true,
-    "status": "success"
-  }
+    "validated": true
+  },
+  "status": "success"
 }

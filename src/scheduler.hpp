@@ -13,13 +13,18 @@
 #include <string_view>
 #include <vector>
 
+template <typename ConnectionManagerType>
 class Scheduler {
     std::reference_wrapper<inja::Environment> env_;
+    std::reference_wrapper<inja::json> store_;
+    std::reference_wrapper<ConnectionManagerType> con_man_;
     Crawler crawler_;
 
 public:
-    Scheduler(inja::Environment &env, Crawler &&crawler)
+    Scheduler(inja::Environment &env, inja::json &store, ConnectionManagerType &con_man, Crawler &&crawler)
         : env_{ std::ref(env) }
+        , store_{ std::ref(store) }
+        , con_man_{ std::ref(con_man) }
         , crawler_{ std::move(crawler) } {
     }
 
@@ -27,7 +32,9 @@ public:
         auto flows = crawler_.crawl();
         for(auto const &[name, flow] : flows) {
             try {
-                auto runner = FlowRunner{ env_.get(), name, flow.first, flow.second };
+                auto runner = FlowRunner<ConnectionManagerType>{
+                    env_, store_, con_man_, name, flow.first, flow.second
+                };
                 runner.run();
 
                 report_success(name);

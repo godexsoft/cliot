@@ -7,13 +7,17 @@
 
 #include <filesystem>
 #include <iostream>
-#include <vector>
+#include <queue>
+#include <set>
 
 class Crawler {
-    using data_t = std::pair<std::vector<Request>, std::vector<Response>>;
+    using path_set_data_t = std::pair<std::string, std::filesystem::path>;
+    using data_t          = std::pair<std::queue<Request>, std::queue<Response>>;
     std::reference_wrapper<inja::Environment> env_;
     std::filesystem::path path_;
-    std::map<std::string, data_t> flows_; // ordered
+
+    std::set<path_set_data_t> paths_;     // all paths ordered
+    std::map<std::string, data_t> flows_; // key ordered by name; requests/responses queued in order
 
 public:
     Crawler(inja::Environment &env, std::filesystem::path path)
@@ -29,6 +33,14 @@ public:
             crawl(entry.path());
         }
 
+        for(auto const &[flow_name, path] : paths_) {
+            auto candidate = path.extension();
+            if(candidate == ".jrq") {
+                flows_[flow_name].first.emplace(env_, path.string());
+            } else if(candidate == ".jrp") {
+                flows_[flow_name].second.emplace(env_, path.string());
+            }
+        }
         return flows_;
     }
 
@@ -41,12 +53,7 @@ private:
             if(not entry.is_regular_file())
                 continue;
 
-            auto candidate = entry.path().extension();
-            if(candidate == ".jrq") {
-                flows_[flow_name].first.emplace_back(env_, entry.path());
-            } else if(candidate == ".jrp") {
-                flows_[flow_name].second.emplace_back(env_, entry.path());
-            }
+            paths_.emplace(flow_name, entry.path());
         }
     }
 
