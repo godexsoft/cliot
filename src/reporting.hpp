@@ -1,5 +1,6 @@
 #pragma once
 
+#include <fmt/color.h>
 #include <fmt/compile.h>
 
 #include <memory>
@@ -8,6 +9,10 @@
 #include <vector>
 
 struct SimpleEvent {
+    SimpleEvent(std::string const &label, std::string const &message)
+        : label{ label }
+        , message{ message } {
+    }
     std::string label;
     std::string message;
 };
@@ -27,11 +32,16 @@ struct DefaultReportRenderer {
     }
 
     void operator()(FailureEvent const &ev) const {
+        std::string flat_issues = fmt::format("{}", fmt::join(ev.issues, "\n"));
+        auto message            = fmt::format(
+            "Failed '{}':\n{}\nLive response:\n---\n{}\n---",
+            ev.path, flat_issues, ev.response);
+
         fmt::print(fg(fmt::color::ghost_white), "- | ");
         fmt::print(fg(fmt::color::red) | fmt::emphasis::bold, "FAIL ");
         fmt::print("'{}': {}\n",
             fmt::format(fg(fmt::color::sky_blue) | fmt::emphasis::bold, "{}", ev.flow_name),
-            fmt::format(fg(fmt::color::red) | fmt::emphasis::italic, "{}", ev.path));
+            fmt::format(fg(fmt::color::red) | fmt::emphasis::italic, "{}", message));
     }
 };
 

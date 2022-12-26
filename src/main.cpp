@@ -60,7 +60,7 @@ int main(int argc, char **argv) try {
 
     using req_t       = Request;
     using resp_t      = Response<Validator>;
-    using crawler_t   = Crawler<req_t, resp_t>;
+    using crawler_t   = Crawler<req_t, resp_t, const rep_renderer_t>;
     using con_man_t   = ConnectionManager<OnDemandConnection>;
     using scheduler_t = Scheduler<con_man_t, req_t, resp_t, const rep_renderer_t>;
 

@@ -8,9 +8,11 @@
 #include <filesystem>
 #include <iostream>
 #include <sstream>
+#include <string>
 #include <string_view>
 #include <vector>
 
+#include <reporting.hpp>
 #include <web.hpp>
 
 // good candidate for CTRE?
@@ -22,6 +24,21 @@ std::string parse_index(std::filesystem::path path) {
 
     return name.substr(0, pos);
 }
+
+struct FlowException : public std::runtime_error {
+    FlowException(
+        std::string const &path,
+        std::vector<std::string> const &issues,
+        std::string const &response)
+        : std::runtime_error{ "FlowException" }
+        , path{ path }
+        , issues{ issues }
+        , response{ response } { }
+
+    std::string path;
+    std::vector<std::string> issues;
+    std::string response;
+};
 
 class Request {
     std::reference_wrapper<inja::Environment> env_;
@@ -75,14 +92,8 @@ public:
 
         auto [valid, issues] = validator_.validate(expectations, incoming);
 
-        if(not valid) {
-            std::string flat_issues = fmt::format("{}", fmt::join(issues, "\n"));
-            auto message            = fmt::format(
-                "Failed '{}':\n{}\nLive response:\n---\n{}\n---",
-                path_, flat_issues, incoming.dump(4));
-
-            throw std::runtime_error(message);
-        }
+        if(not valid)
+            throw FlowException(path_, issues, incoming.dump(4));
     }
 
     std::string index() const {
@@ -90,17 +101,23 @@ public:
     }
 };
 
-template <typename ConnectionManagerType, typename RequestType, typename ResponseType>
+template <
+    typename ConnectionManagerType,
+    typename RequestType,
+    typename ResponseType,
+    typename ReportRendererType>
 class FlowRunner {
     // all services needed for the flow runner:
-    using env_t      = inja::Environment;
-    using store_t    = inja::json;
-    using con_man_t  = ConnectionManagerType;
-    using services_t = di::Deps<env_t, store_t, con_man_t>;
+    using env_t             = inja::Environment;
+    using store_t           = inja::json;
+    using con_man_t         = ConnectionManagerType;
+    using reporting_t       = ReportEngine;
+    using report_renderer_t = ReportRendererType;
+    using services_t        = di::Deps<env_t, store_t, con_man_t, reporting_t, report_renderer_t>;
 
     services_t services_;
 
-    std::string_view name_;
+    std::string name_;
     std::queue<RequestType> requests_;
     std::queue<ResponseType> responses_;
 
@@ -116,7 +133,7 @@ public:
         , responses_{ responses } { }
 
     void run() {
-        report_running();
+        report("RUNNING", name_);
         auto const &[store, con_man] = services_.template get<store_t, con_man_t>();
 
         while(not requests_.empty()) {
@@ -126,7 +143,7 @@ public:
             if(responses_.empty())
                 throw std::runtime_error("No more responses left to check.. unbalanced");
 
-            report_request(req.index());
+            report("RUN REQUEST", req.index());
             auto data = req.template perform<ConnectionManagerType>(store, con_man);
 
             if(responses_.front().index() != req.index())
@@ -138,7 +155,7 @@ public:
                     break; // done matching responses
 
                 // TODO: hm, what about multiple messages??
-                report_response(resp.index());
+                report("CHECK RESPONSE", resp.index());
                 resp.validate(store, inja::json::parse(data));
                 responses_.pop();
             }
@@ -149,23 +166,8 @@ public:
 
 private:
     void
-    report_running() {
-        fmt::print(fg(fmt::color::ghost_white), "? | ");
-        fmt::print(fg(fmt::color::pale_green) | fmt::emphasis::bold, "RUN FLOW ");
-        fmt::print(fg(fmt::color::sky_blue) | fmt::emphasis::bold, "{}\n", name_);
-    }
-
-    void
-    report_request(std::string_view idx) {
-        fmt::print(fg(fmt::color::ghost_white), "? | ");
-        fmt::print(fg(fmt::color::pale_green) | fmt::emphasis::bold, "RUN REQUEST ");
-        fmt::print(fg(fmt::color::sky_blue) | fmt::emphasis::bold, "request {}\n", idx);
-    }
-
-    void
-    report_response(std::string_view idx) {
-        fmt::print(fg(fmt::color::ghost_white), "? | ");
-        fmt::print(fg(fmt::color::pale_green) | fmt::emphasis::bold, "CHECK RESPONSE ");
-        fmt::print(fg(fmt::color::sky_blue) | fmt::emphasis::bold, "response {}\n", idx);
+    report(std::string const &label, std::string const &message) {
+        auto const &[reporting, renderer] = services_.template get<reporting_t, report_renderer_t>();
+        reporting.get().record(SimpleEvent{ label, message }, renderer);
     }
 };

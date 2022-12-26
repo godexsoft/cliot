@@ -1,5 +1,6 @@
 #pragma once
 
+#include <reporting.hpp>
 #include <runner.hpp>
 
 #include <fmt/compile.h>
@@ -10,11 +11,13 @@
 #include <queue>
 #include <set>
 
-template <typename RequestType, typename ResponseType>
+template <typename RequestType, typename ResponseType, typename ReportRendererType>
 class Crawler {
     // all deps needed for the crawler:
-    using env_t      = inja::Environment;
-    using services_t = di::Deps<env_t>;
+    using env_t             = inja::Environment;
+    using reporting_t       = ReportEngine;
+    using report_renderer_t = ReportRendererType;
+    using services_t        = di::Deps<env_t, reporting_t, report_renderer_t>;
 
     using path_set_data_t = std::pair<std::string, std::filesystem::path>;
     using data_t          = std::pair<std::queue<RequestType>, std::queue<ResponseType>>;
@@ -31,7 +34,7 @@ public:
         , path_{ path } { }
 
     auto crawl() {
-        auto const &env = services_.get<env_t>();
+        auto const &env = services_.template get<env_t>();
         auto path       = path_ / "flows";
 
         if(not std::filesystem::exists(path))
@@ -66,9 +69,8 @@ private:
         }
     }
 
-    void report_detected(std::string_view name) {
-        fmt::print(fg(fmt::color::ghost_white), "+ | ");
-        fmt::print(fg(fmt::color::light_green) | fmt::emphasis::bold, "DETECT FLOW ");
-        fmt::print(fg(fmt::color::sky_blue) | fmt::emphasis::bold, "{}\n", name);
+    void report_detected(std::string const &name) {
+        auto const &[reporting, renderer] = services_.template get<reporting_t, report_renderer_t>();
+        reporting.get().record(SimpleEvent{ "DETECT FLOW", name }, renderer);
     }
 };

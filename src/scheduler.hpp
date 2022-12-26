@@ -27,10 +27,11 @@ class Scheduler {
     using con_man_t         = ConnectionManagerType;
     using reporting_t       = ReportEngine;
     using report_renderer_t = ReportRendererType;
-    using crawler_t         = Crawler<RequestType, ResponseType>;
+    using crawler_t         = Crawler<RequestType, ResponseType, report_renderer_t>;
     using services_t        = di::Deps<env_t, store_t, con_man_t, reporting_t, report_renderer_t, crawler_t>;
 
     services_t services_;
+    using flow_runner_t = FlowRunner<ConnectionManagerType, RequestType, ResponseType, report_renderer_t>;
 
 public:
     Scheduler(services_t services)
@@ -42,34 +43,15 @@ public:
         auto flows            = services_.template get<crawler_t>().get().crawl();
         for(auto const &[name, flow] : flows) {
             try {
-                auto runner = FlowRunner<ConnectionManagerType, RequestType, ResponseType>{
+                auto runner = flow_runner_t{
                     services_, name, flow.first, flow.second
                 };
                 runner.run();
-
-                report_success(name);
                 reporting.get().record(SimpleEvent{ "SUCCESS", name }, renderer);
 
-            } catch(std::exception const &e) {
-                // we need custom exception here i reckon.. to hold FailureEvent basically
-                report_failure(name, e.what());
-                // reporting.get().record(FailureEvent{ name, }, renderer);
+            } catch(FlowException const &e) {
+                reporting.get().record(FailureEvent{ name, e.path, e.issues, e.response }, renderer);
             }
         }
-    }
-
-private:
-    void report_success(std::string_view name) {
-        fmt::print(fg(fmt::color::ghost_white), "+ | ");
-        fmt::print(fg(fmt::color::green) | fmt::emphasis::bold, "SUCCESS ");
-        fmt::print(fg(fmt::color::sky_blue) | fmt::emphasis::bold, "{}\n", name);
-    }
-
-    void report_failure(std::string_view name, std::string_view msg) {
-        fmt::print(fg(fmt::color::ghost_white), "- | ");
-        fmt::print(fg(fmt::color::red) | fmt::emphasis::bold, "FAIL ");
-        fmt::print("'{}': {}\n",
-            fmt::format(fg(fmt::color::sky_blue) | fmt::emphasis::bold, "{}", name),
-            fmt::format(fg(fmt::color::red) | fmt::emphasis::italic, "{}", msg));
     }
 };
