@@ -1,22 +1,11 @@
-#include <gtest/gtest.h>
-
-#include <web.hpp>
+#pragma once
 
 #include <fmt/compile.h>
 
-struct MockHandler {
-    std::string host;
-    uint16_t port;
-
-    std::string request(std::string &&) {
-        return "{data}";
-    }
-};
-
-TEST(Cliot, ConnectionManagerTest) {
-    ConnectionManager<MockHandler> man{ "127.0.0.1", 1234 };
-    EXPECT_EQ(man.send(R"({"method":"server_info"})"), "{data}");
-}
+#include <memory>
+#include <mutex>
+#include <string>
+#include <vector>
 
 struct SimpleEvent {
     std::string label;
@@ -65,9 +54,9 @@ private:
 
     template <typename T, typename Renderer>
     struct Model : public Concept {
-        Model(T &&ev, Renderer const &renderer)
+        Model(T &&ev, std::reference_wrapper<const Renderer> renderer)
             : ev{ std::move(ev) }
-            , renderer{ std::cref(renderer) } { }
+            , renderer{ renderer } { }
 
         void render() const override {
             renderer.get()(ev);
@@ -89,7 +78,7 @@ public:
     template <typename EventType, typename RendererType>
     void record(EventType &&ev, RendererType const &renderer) {
         std::scoped_lock lk{ mtx_ };
-        events_.push_back(AnyEvent{ std::move(ev), renderer });
+        events_.emplace_back(std::move(ev), std::cref(renderer));
     }
 
     void sync_print() {
@@ -99,13 +88,3 @@ public:
         }
     }
 };
-
-TEST(Cliot, Reporting) {
-    ReportEngine re;
-    DefaultReportRenderer renderer;
-
-    re.record(SimpleEvent{ "HELLO", "world" }, renderer); // add event to timeline;
-    re.record(FailureEvent{ "flow1", "path", { "issue1", "issue2" }, "{json}" }, renderer);
-
-    re.sync_print();
-}

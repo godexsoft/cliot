@@ -25,7 +25,7 @@
       "cache": {
       },
       "etl": {
-        "read_only": false
+        "read_only": true
       }
     },
     "validated": true

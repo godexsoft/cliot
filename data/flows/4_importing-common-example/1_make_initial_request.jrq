@@ -1,0 +1,3 @@
+{% extends "../../common/request.jrq" %}
+
+{% block method %}server_info{% endblock %}

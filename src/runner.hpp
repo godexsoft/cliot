@@ -1,5 +1,6 @@
 #pragma once
 
+#include <di.hpp>
 #include <fmt/color.h>
 #include <fmt/compile.h>
 #include <inja/inja.hpp>
@@ -48,20 +49,19 @@ public:
     }
 };
 
+template <typename ValidatorType>
 class Response {
     std::reference_wrapper<inja::Environment> env_;
     std::string index_;
-    std::string path_; // full path to response file
-
-    std::string issues_ = {};
-    bool is_valid_      = true;
+    std::string path_;
+    ValidatorType validator_;
 
 public:
     Response(inja::Environment &env, std::string const &path)
         : env_{ std::ref(env) }
         , index_{ parse_index(path) }
-        , path_{ path } {
-    }
+        , path_{ path } { }
+
     Response(Response &&)      = delete;
     Response(Response const &) = default;
 
@@ -73,81 +73,51 @@ public:
         auto result       = env_.get().render(temp, data);
         auto expectations = inja::json::parse(result);
 
-        dovalidate("", expectations, incoming);
-        if(not is_valid_)
-            throw std::runtime_error(fmt::format(
-                "Failed '{}': {}\n\n---\n{}\n---",
-                path_, issues_, incoming.dump(4)));
+        auto [valid, issues] = validator_.validate(expectations, incoming);
+
+        if(not valid) {
+            std::string flat_issues = fmt::format("{}", fmt::join(issues, "\n"));
+            auto message            = fmt::format(
+                "Failed '{}':\n{}\nLive response:\n---\n{}\n---",
+                path_, flat_issues, incoming.dump(4));
+
+            throw std::runtime_error(message);
+        }
     }
 
     std::string index() const {
         return index_;
     }
-
-private:
-    void dovalidate(std::string path, inja::json const &expectations, inja::json const &incoming) {
-        if(expectations.is_null() or expectations.empty())
-            return;
-
-        if(expectations.is_object()) {
-            for(auto const &expectation : expectations.items()) {
-                auto const &key = expectation.key();
-                if(not incoming.contains(key)) {
-                    auto const full_path = [&path, &key]() -> std::string {
-                        if(path.empty())
-                            return key;
-                        return path + '.' + key;
-                    }();
-                    add_issue("NO MATCH", full_path, "Key is not present in the response");
-
-                } else {
-                    dovalidate(path + (path.empty() ? "" : ".") + key,
-                        expectation.value(),
-                        incoming[key]);
-                }
-            }
-        } else {
-            if(expectations != incoming) {
-                std::stringstream ss;
-                ss << expectations << " != " << incoming;
-                add_issue("NOT EQUAL", path, ss.str());
-            }
-        }
-    }
-
-    void add_issue(std::string_view subject, std::string_view path, std::string_view detail) {
-        is_valid_ = false;
-        issues_ += fmt::format("\n    *** {} [{}]: {}", subject, path, detail);
-    }
 };
 
-template <typename ConnectionManagerType>
+template <typename ConnectionManagerType, typename RequestType, typename ResponseType>
 class FlowRunner {
-    std::reference_wrapper<inja::Environment> env_;
-    std::reference_wrapper<inja::json> store_;
-    std::reference_wrapper<ConnectionManagerType> con_man_;
+    // all services needed for the flow runner:
+    using env_t      = inja::Environment;
+    using store_t    = inja::json;
+    using con_man_t  = ConnectionManagerType;
+    using services_t = di::Deps<env_t, store_t, con_man_t>;
+
+    services_t services_;
+
     std::string_view name_;
-    std::queue<Request> requests_;
-    std::queue<Response> responses_;
+    std::queue<RequestType> requests_;
+    std::queue<ResponseType> responses_;
 
 public:
     FlowRunner(
-        inja::Environment &env,
-        inja::json &store,
-        ConnectionManagerType &con_man,
+        services_t services,
         std::string_view name,
-        std::queue<Request> const &requests,
-        std::queue<Response> const &responses)
-        : env_{ std::ref(env) }
-        , store_{ std::ref(store) }
-        , con_man_{ std::ref(con_man) }
+        std::queue<RequestType> const &requests,
+        std::queue<ResponseType> const &responses)
+        : services_{ services }
         , name_{ name }
         , requests_{ requests }
-        , responses_{ responses } {
-    }
+        , responses_{ responses } { }
 
     void run() {
         report_running();
+        auto const &[store, con_man] = services_.template get<store_t, con_man_t>();
 
         while(not requests_.empty()) {
             auto &req = requests_.front();
@@ -157,7 +127,8 @@ public:
                 throw std::runtime_error("No more responses left to check.. unbalanced");
 
             report_request(req.index());
-            auto data = req.perform<ConnectionManagerType>(store_, con_man_);
+            auto data = req.template perform<ConnectionManagerType>(store, con_man);
+
             if(responses_.front().index() != req.index())
                 throw std::logic_error("Index of request is not matching index of response");
 
@@ -168,7 +139,7 @@ public:
 
                 // TODO: hm, what about multiple messages??
                 report_response(resp.index());
-                resp.validate(store_, inja::json::parse(data));
+                resp.validate(store, inja::json::parse(data));
                 responses_.pop();
             }
 

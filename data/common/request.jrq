@@ -1,0 +1,3 @@
+{
+    "method": "{% block method %}unset{% endblock %}"
+}

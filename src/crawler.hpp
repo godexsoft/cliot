@@ -10,22 +10,30 @@
 #include <queue>
 #include <set>
 
+template <typename RequestType, typename ResponseType>
 class Crawler {
+    // all deps needed for the crawler:
+    using env_t      = inja::Environment;
+    using services_t = di::Deps<env_t>;
+
     using path_set_data_t = std::pair<std::string, std::filesystem::path>;
-    using data_t          = std::pair<std::queue<Request>, std::queue<Response>>;
-    std::reference_wrapper<inja::Environment> env_;
+    using data_t          = std::pair<std::queue<RequestType>, std::queue<ResponseType>>;
+
+    services_t services_;
     std::filesystem::path path_;
 
     std::set<path_set_data_t> paths_;     // all paths ordered
     std::map<std::string, data_t> flows_; // key ordered by name; requests/responses queued in order
 
 public:
-    Crawler(inja::Environment &env, std::filesystem::path path)
-        : env_{ std::ref(env) }
+    Crawler(services_t services, std::filesystem::path path)
+        : services_{ services }
         , path_{ path } { }
 
     auto crawl() {
-        auto path = path_ / "flows";
+        auto const &env = services_.get<env_t>();
+        auto path       = path_ / "flows";
+
         if(not std::filesystem::exists(path))
             throw std::runtime_error("given path does not appear to be valid: missing 'flows' sub directory");
 
@@ -36,11 +44,12 @@ public:
         for(auto const &[flow_name, path] : paths_) {
             auto candidate = path.extension();
             if(candidate == ".jrq") {
-                flows_[flow_name].first.emplace(env_, path.string());
+                flows_[flow_name].first.emplace(env, path.string());
             } else if(candidate == ".jrp") {
-                flows_[flow_name].second.emplace(env_, path.string());
+                flows_[flow_name].second.emplace(env, path.string());
             }
         }
+
         return flows_;
     }
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <crab/crab.hpp>
+#include <di.hpp>
 #include <fmt/color.h>
 #include <fmt/compile.h>
 #include <inja/inja.hpp>

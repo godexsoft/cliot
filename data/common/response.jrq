@@ -1,0 +1,17 @@
+{
+{% block result %}
+    "result": {
+        {% block result.info %}
+            "info": {
+            },
+        {% endblock %}
+        {% block result.etl %}
+            "etl": {
+            }
+        {% endblock %}
+    },
+{% endblock %}
+{% block status %}
+    "status": "success"
+{% endblock %}
+}

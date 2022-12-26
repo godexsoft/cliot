@@ -1,8 +1,10 @@
 #pragma once
 
 #include <crawler.hpp>
+#include <reporting.hpp>
 #include <runner.hpp>
 
+#include <di.hpp>
 #include <fmt/color.h>
 #include <fmt/compile.h>
 #include <inja/inja.hpp>
@@ -13,33 +15,45 @@
 #include <string_view>
 #include <vector>
 
-template <typename ConnectionManagerType>
+template <
+    typename ConnectionManagerType,
+    typename RequestType,
+    typename ResponseType,
+    typename ReportRendererType>
 class Scheduler {
-    std::reference_wrapper<inja::Environment> env_;
-    std::reference_wrapper<inja::json> store_;
-    std::reference_wrapper<ConnectionManagerType> con_man_;
-    Crawler crawler_;
+    // all services needed for the scheduler:
+    using env_t             = inja::Environment;
+    using store_t           = inja::json;
+    using con_man_t         = ConnectionManagerType;
+    using reporting_t       = ReportEngine;
+    using report_renderer_t = ReportRendererType;
+    using crawler_t         = Crawler<RequestType, ResponseType>;
+    using services_t        = di::Deps<env_t, store_t, con_man_t, reporting_t, report_renderer_t, crawler_t>;
+
+    services_t services_;
 
 public:
-    Scheduler(inja::Environment &env, inja::json &store, ConnectionManagerType &con_man, Crawler &&crawler)
-        : env_{ std::ref(env) }
-        , store_{ std::ref(store) }
-        , con_man_{ std::ref(con_man) }
-        , crawler_{ std::move(crawler) } {
-    }
+    Scheduler(services_t services)
+        : services_{ services } { }
 
     void run() {
-        auto flows = crawler_.crawl();
+        auto const &reporting = services_.template get<reporting_t>();
+        auto const &renderer  = services_.template get<report_renderer_t>();
+        auto flows            = services_.template get<crawler_t>().get().crawl();
         for(auto const &[name, flow] : flows) {
             try {
-                auto runner = FlowRunner<ConnectionManagerType>{
-                    env_, store_, con_man_, name, flow.first, flow.second
+                auto runner = FlowRunner<ConnectionManagerType, RequestType, ResponseType>{
+                    services_, name, flow.first, flow.second
                 };
                 runner.run();
 
                 report_success(name);
+                reporting.get().record(SimpleEvent{ "SUCCESS", name }, renderer);
+
             } catch(std::exception const &e) {
+                // we need custom exception here i reckon.. to hold FailureEvent basically
                 report_failure(name, e.what());
+                // reporting.get().record(FailureEvent{ name, }, renderer);
             }
         }
     }

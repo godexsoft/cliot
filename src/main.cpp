@@ -1,9 +1,11 @@
 #include <crawler.hpp>
+#include <reporting.hpp>
 #include <runner.hpp>
 #include <scheduler.hpp>
 #include <validation.hpp>
 
 #include <cxxopts.hpp>
+#include <di.hpp>
 #include <fmt/compile.h>
 #include <inja/inja.hpp>
 
@@ -18,71 +20,15 @@ void usage(std::string msg) {
 }
 
 int main(int argc, char **argv) try {
-    // parse command line options
-    // first arg is path to data directory
-
-    // create runner
-    // runner is given the path
-    // runner will crawl the path for flows
-
-    // runner will end up with a list of flows to execute
-    // flows are found in by data/flows/1_some_flow/1.jrq,1.jrp,2.jrq,2.jrp etc.
-    // flows are collections of requests and responses as templates in inja
-    // so they can include other subflows or helpers
-
-    // flow consists of two arrays, one with requests and one with responses
-    // the flow is executed synchronously. the names of requests and responses
-    // are starting from a digit. this determains which request should match which response
-    // as well as their order.
-
-    // we have two pointers each pointing at the current request and response in the queue
-    // sometimes one request could yield more than one response that we wish to await..
-    // so we have to work around that.
-
-    // as the request is executed it's injected with the environment (environment.json)
-    // as well as a special entry is created at `$res` which contains the actual response
-    // data that we are working with at this moment.
-
-    // since we were able to save things from the response and onto our store
-    // we now can inject the store alongside the environment so the next request
-    // can benefit from both saved data as well as stock environment values.
-    // TBD can the environment json be the store simultaniously? that kinda makes sense.
-
-    // as the request is done and we receive the response, we are going to
-    // - load the response template
-    // - render it with environment/store injected
-    // - send this template and the input request to the validator
-
-    // validator receives two strings with json
-    // 1) the expectations object
-    // 2) the input response json data
-    //
-    // the expectations are recursively applied to the input json
-    // any failure should result in a thrown exception with a reasonable message
-    // we catch the exceptions all the way in the runner, mark the test failed and
-    // carry on with the other tests.
-
-    // think about stats and logging/debugging tests
-
-    // Scheduler - top level flow scheduler. combines all other parts
-    //   Crawler - find the flows and return back paths to each flow (parsed into hierarchy)
-    //   flows   - ordered, perform for each:
-    //      Runner  - runs a single flow
-    //        Request  - handle response
-    //           - asio stuff, store/env, inja parsing
-    //        Response - handle response
-    //           - asio, store/env, inja
-    //           Validator - flow validation
-
     // this is some sort of context.. maybe wrap this all?
     Environment env;
-    json store_ = env.load_json("./data/environment.json");
+    json store = env.load_json("./data/environment.json");
 
-    auto store_cb = [&store_](Arguments &args) {
+    auto store_cb = [&store](Arguments &args) {
         auto value = args.at(0)->get<json>();
         auto var   = args.at(1)->get<std::string>();
 
-        store_[var] = value;
+        store[var] = value;
         return value;
     };
     env.add_callback("store", 2, store_cb);
@@ -107,13 +53,31 @@ int main(int argc, char **argv) try {
     auto host = result["host"].as<std::string>();
     auto port = result["port"].as<uint16_t>();
 
-    using connection_manager_t = ConnectionManager<OnDemandConnection>;
-    using scheduler_t          = Scheduler<connection_manager_t>;
+    using env_t          = inja::Environment;
+    using rep_t          = ReportEngine;
+    using rep_renderer_t = DefaultReportRenderer;
+    using store_t        = inja::json;
 
-    auto con_man   = connection_manager_t{ host, port };
-    auto scheduler = scheduler_t{ env, store_, con_man, Crawler{ env, path } };
+    using req_t       = Request;
+    using resp_t      = Response<Validator>;
+    using crawler_t   = Crawler<req_t, resp_t>;
+    using con_man_t   = ConnectionManager<OnDemandConnection>;
+    using scheduler_t = Scheduler<con_man_t, req_t, resp_t, const rep_renderer_t>;
 
+    rep_t reporting{};
+    rep_renderer_t rep_renderer{};
+
+    di::Deps<env_t, rep_t, const rep_renderer_t, store_t> deps{ env, reporting, rep_renderer, store };
+    con_man_t con_man{ host, port };
+    crawler_t crawler{ deps, path };
+
+    // this nonsense should be just: di::extend(deps, con_man, crawler)
+    // todo: find out why it does not work
+    scheduler_t scheduler(di::combine(deps, di::Deps<con_man_t, crawler_t>{ con_man, crawler }));
     scheduler.run();
+
+    // prints report after completion
+    reporting.sync_print();
 
     return EXIT_SUCCESS;
 } catch(std::exception const &e) {
