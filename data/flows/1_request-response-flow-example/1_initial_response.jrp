@@ -25,10 +25,12 @@
       "cache": {
       },
       "etl": {
-        "read_only": true
+        "read_only": false
       }
     },
     "validated": true
   },
   "status": "success"
 }
+
+{{ report("Parsed version: " + $res.result.info.clio_version) }}

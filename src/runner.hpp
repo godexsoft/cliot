@@ -58,10 +58,12 @@ public:
         return index_;
     }
 
-    template <typename ConnectionManagerType>
-    std::string perform(inja::json const &store, ConnectionManagerType &con_man) {
+    template <typename ConnectionManagerType, typename ReportHelper>
+    std::string perform(inja::json const &store, ConnectionManagerType &con_man, ReportHelper report) {
         auto temp = env_.get().parse_template(path_);
         auto res  = env_.get().render(temp, store);
+
+        report(RequestEvent{ path_, index_, store, res });
         return con_man.send(std::move(res));
     }
 };
@@ -82,7 +84,8 @@ public:
     Response(Response &&)      = delete;
     Response(Response const &) = default;
 
-    void validate(inja::json const &store, inja::json const &incoming) {
+    template <typename ReportHelper>
+    void validate(inja::json const &store, inja::json const &incoming, ReportHelper report) {
         inja::json data = store;
         data["$res"]    = incoming;
 
@@ -90,6 +93,7 @@ public:
         auto result       = env_.get().render(temp, data);
         auto expectations = inja::json::parse(result);
 
+        report(ResponseEvent{ path_, index_, incoming.dump(4), expectations.dump(4) });
         auto [valid, issues] = validator_.validate(expectations, incoming);
 
         if(not valid)
@@ -144,7 +148,8 @@ public:
                 throw std::runtime_error("No more responses left to check.. unbalanced");
 
             report("RUN REQUEST", req.index());
-            auto data = req.template perform<ConnectionManagerType>(store, con_man);
+            auto data = req.template perform<ConnectionManagerType>(
+                store, con_man, std::bind_front(&FlowRunner::report<RequestEvent>, this));
 
             if(responses_.front().index() != req.index())
                 throw std::logic_error("Index of request is not matching index of response");
@@ -156,7 +161,8 @@ public:
 
                 // TODO: hm, what about multiple messages??
                 report("CHECK RESPONSE", resp.index());
-                resp.validate(store, inja::json::parse(data));
+                resp.validate(store, inja::json::parse(data),
+                    std::bind_front(&FlowRunner::report<ResponseEvent>, this));
                 responses_.pop();
             }
 
@@ -169,5 +175,11 @@ private:
     report(std::string const &label, std::string const &message) {
         auto const &[reporting, renderer] = services_.template get<reporting_t, report_renderer_t>();
         reporting.get().record(SimpleEvent{ label, message }, renderer);
+    }
+
+    void
+    report(auto &&ev) {
+        auto const &[reporting, renderer] = services_.template get<reporting_t, report_renderer_t>();
+        reporting.get().record(std::move(ev), renderer);
     }
 };

@@ -47,7 +47,7 @@ public:
                     services_, name, flow.first, flow.second
                 };
                 runner.run();
-                reporting.get().record(SimpleEvent{ "SUCCESS", name }, renderer);
+                reporting.get().record(SuccessEvent{ name }, renderer);
 
             } catch(FlowException const &e) {
                 reporting.get().record(FailureEvent{ name, e.path, e.issues, e.response }, renderer);
