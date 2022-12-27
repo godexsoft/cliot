@@ -12,6 +12,7 @@
 #include <string_view>
 #include <vector>
 
+#include <events.hpp>
 #include <reporting.hpp>
 #include <web.hpp>
 
@@ -28,7 +29,7 @@ std::string parse_index(std::filesystem::path path) {
 struct FlowException : public std::runtime_error {
     FlowException(
         std::string const &path,
-        std::vector<std::string> const &issues,
+        std::vector<FailureEvent::Data> const &issues,
         std::string const &response)
         : std::runtime_error{ "FlowException" }
         , path{ path }
@@ -36,7 +37,7 @@ struct FlowException : public std::runtime_error {
         , response{ response } { }
 
     std::string path;
-    std::vector<std::string> issues;
+    std::vector<FailureEvent::Data> issues;
     std::string response;
 };
 
@@ -63,7 +64,7 @@ public:
         auto temp = env_.get().parse_template(path_);
         auto res  = env_.get().render(temp, store);
 
-        report(RequestEvent{ path_, index_, store, res });
+        report(RequestEvent{ path_, index_, store, inja::json::parse(res).dump(4) });
         return con_man.send(std::move(res));
     }
 };
@@ -86,18 +87,25 @@ public:
 
     template <typename ReportHelper>
     void validate(inja::json const &store, inja::json const &incoming, ReportHelper report) {
-        inja::json data = store;
-        data["$res"]    = incoming;
+        try {
+            inja::json data = store;
+            data["$res"]    = incoming;
 
-        auto temp         = env_.get().parse_template(path_);
-        auto result       = env_.get().render(temp, data);
-        auto expectations = inja::json::parse(result);
+            auto temp         = env_.get().parse_template(path_);
+            auto result       = env_.get().render(temp, data);
+            auto expectations = inja::json::parse(result);
 
-        report(ResponseEvent{ path_, index_, incoming.dump(4), expectations.dump(4) });
-        auto [valid, issues] = validator_.validate(expectations, incoming);
+            report(ResponseEvent{ path_, index_, incoming.dump(4), expectations.dump(4) });
+            auto [valid, issues] = validator_.validate(expectations, incoming);
 
-        if(not valid)
+            if(not valid)
+                throw FlowException(path_, issues, incoming.dump(4));
+        } catch(inja::InjaError const &e) {
+            auto const issues = std::vector<FailureEvent::Data>{
+                { FailureEvent::Data::Type::LOGIC_ERROR, path_, e.message }
+            };
             throw FlowException(path_, issues, incoming.dump(4));
+        }
     }
 
     std::string index() const {
@@ -162,6 +170,7 @@ public:
                 report("CHECK RESPONSE", resp.index());
                 resp.validate(store, inja::json::parse(data),
                     std::bind_front(&FlowRunner::report<ResponseEvent>, this));
+
                 responses_.pop();
             }
 

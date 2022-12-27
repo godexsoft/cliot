@@ -1,0 +1,6 @@
+{% set status = "error" %}
+{% set error = "unknownCmd" %}
+{% set error_code = 32 %}
+{% set error_message = "Unknown method." %}
+
+{% include "../../common/response.jrp" %}

@@ -5,19 +5,21 @@
 
 #include <iostream>
 
+#include <events.hpp>
+
 class Validator {
-    using issues_vec_t   = std::vector<std::string>;
+    using issues_vec_t   = std::vector<FailureEvent::Data>;
     issues_vec_t issues_ = {};
     bool is_valid_       = true;
 
 public:
     std::pair<bool, issues_vec_t> validate(inja::json const &expectations, inja::json const &incoming) {
-        dovalidate("", expectations, incoming);
+        do_validate("", expectations, incoming);
         return { is_valid_, issues_ };
     }
 
 private:
-    void dovalidate(std::string path, inja::json const &expectations, inja::json const &incoming) {
+    void do_validate(std::string path, inja::json const &expectations, inja::json const &incoming) {
         if(expectations.is_null() or expectations.empty())
             return;
 
@@ -30,10 +32,10 @@ private:
                             return key;
                         return path + '.' + key;
                     }();
-                    add_issue("NO MATCH", full_path, "Key is not present in the response");
+                    add_issue(FailureEvent::Data::Type::NO_MATCH, full_path, "Key is not present in the response");
 
                 } else {
-                    dovalidate(path + (path.empty() ? "" : ".") + key,
+                    do_validate(path + (path.empty() ? "" : ".") + key,
                         expectation.value(),
                         incoming[key]);
                 }
@@ -42,13 +44,13 @@ private:
             if(expectations != incoming) {
                 std::stringstream ss;
                 ss << expectations << " != " << incoming;
-                add_issue("NOT EQUAL", path, ss.str());
+                add_issue(FailureEvent::Data::Type::NOT_EQUAL, path, ss.str());
             }
         }
     }
 
-    void add_issue(std::string_view subject, std::string_view path, std::string_view detail) {
+    void add_issue(FailureEvent::Data::Type type, std::string const &path, std::string const &message) {
         is_valid_ = false;
-        issues_.push_back(fmt::format("*** {} [{}]: {}", subject, path, detail));
+        issues_.emplace_back(type, path, message);
     }
 };

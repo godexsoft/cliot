@@ -46,7 +46,7 @@ public:
         }
 
         for(auto const &[flow_name, path] : paths_) {
-            if(not passes_filter(flow_name))
+            if(not is_passing_filter(flow_name))
                 continue;
 
             auto candidate = path.extension();
@@ -78,7 +78,7 @@ private:
         reporting.get().record(SimpleEvent{ "DETECT FLOW", name });
     }
 
-    bool passes_filter(std::string_view flow_name) const {
+    bool is_passing_filter(std::string_view flow_name) const {
         return flow_name.find(filter_) != std::string_view::npos;
     }
 };

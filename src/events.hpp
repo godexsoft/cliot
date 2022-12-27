@@ -30,10 +30,28 @@ struct SuccessEvent : public MetaEvent {
 };
 
 struct FailureEvent : public MetaEvent {
+    struct Data {
+        enum class Type {
+            LOGIC_ERROR,
+            NO_MATCH,
+            NOT_EQUAL
+        };
+        Data(
+            Type type,
+            std::string const &path,
+            std::string const &message)
+            : type{ type }
+            , path{ path }
+            , message{ message } { }
+        Type type;
+        std::string path;
+        std::string message;
+    };
+
     FailureEvent(
         std::string const &flow_name,
         std::string const &path,
-        std::vector<std::string> const &issues,
+        std::vector<Data> const &issues,
         std::string const &response)
         : MetaEvent{}
         , flow_name{ flow_name }
@@ -42,7 +60,7 @@ struct FailureEvent : public MetaEvent {
         , response{ response } { }
     std::string flow_name;
     std::string path;
-    std::vector<std::string> issues;
+    std::vector<Data> issues;
     std::string response;
 };
 
