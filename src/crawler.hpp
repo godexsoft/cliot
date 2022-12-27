@@ -24,14 +24,16 @@ class Crawler {
 
     services_t services_;
     std::filesystem::path path_;
+    std::string filter_;
 
     std::set<path_set_data_t> paths_;     // all paths ordered
     std::map<std::string, data_t> flows_; // key ordered by name; requests/responses queued in order
 
 public:
-    Crawler(services_t services, std::filesystem::path path)
+    Crawler(services_t services, std::filesystem::path path, std::string const &filter)
         : services_{ services }
-        , path_{ path } { }
+        , path_{ path }
+        , filter_{ filter } { }
 
     auto crawl() {
         auto const &env = services_.template get<env_t>();
@@ -45,6 +47,9 @@ public:
         }
 
         for(auto const &[flow_name, path] : paths_) {
+            if(not passes_filter(flow_name))
+                continue;
+
             auto candidate = path.extension();
             if(candidate == ".jrq") {
                 flows_[flow_name].first.emplace(env, path.string());
@@ -72,5 +77,9 @@ private:
     void report_detected(std::string const &name) {
         auto const &[reporting, renderer] = services_.template get<reporting_t, report_renderer_t>();
         reporting.get().record(SimpleEvent{ "DETECT FLOW", name }, renderer);
+    }
+
+    bool passes_filter(std::string_view flow_name) const {
+        return flow_name.find(filter_) != std::string_view::npos;
     }
 };

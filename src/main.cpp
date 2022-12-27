@@ -39,6 +39,7 @@ auto parse_options(int argc, char **argv) {
       ("h,help", "Print help message and exit")
       ("H,host", "Clio server ip address", cxxopts::value<std::string>()->default_value("127.0.0.1"))
       ("P,port", "The port Clio is running on", cxxopts::value<uint16_t>()->default_value("51233"))
+      ("f,filter", "Filter flows for execution", cxxopts::value<std::string>()->default_value(""))
     ;
     options.parse_positional({"path"});
     // clang-format on
@@ -76,6 +77,7 @@ int main(int argc, char **argv) try {
     auto path    = result["path"].as<std::string>();
     auto host    = result["host"].as<std::string>();
     auto port    = result["port"].as<uint16_t>();
+    auto filter  = result["filter"].as<std::string>();
     auto verbose = result["verbose"].as<uint16_t>();
 
     // this is some sort of context.. maybe wrap this all?
@@ -88,7 +90,7 @@ int main(int argc, char **argv) try {
 
     di::Deps<env_t, rep_t, const rep_renderer_t, store_t> deps{ env, reporting, rep_renderer, store };
     con_man_t con_man{ host, port };
-    crawler_t crawler{ deps, path };
+    crawler_t crawler{ deps, path, filter };
 
     register_extensions(env, store, reporting, rep_renderer);
 

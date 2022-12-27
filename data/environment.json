@@ -1,1 +1,4 @@
-{"Method":"ledger_info", "Seq":123, "Account":"rL4fPHi2FWGwRGRQSH7gBcxkuo2b9NTjKKa"}
+{
+    "Seq": 123,
+    "Account": "rL4fPHi2FWGwRGRQSH7gBcxkuo2b9NTjKKa"
+}
