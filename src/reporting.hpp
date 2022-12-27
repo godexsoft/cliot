@@ -40,16 +40,23 @@ struct DefaultReportRenderer {
             return fmt::format(fg(fmt::color::indian_red) | fmt::emphasis::bold, "NO MATCH");
         case FailureEvent::Data::Type::NOT_EQUAL:
             return fmt::format(fg(fmt::color::indian_red) | fmt::emphasis::bold, "NOT EQUAL");
+        case FailureEvent::Data::Type::TYPE_CHECK:
+            return fmt::format(fg(fmt::color::indian_red) | fmt::emphasis::bold, "WRONG TYPE");
         }
     }
 
     std::string operator()(FailureEvent::Data const &failure) const {
         if(verbose < 1)
             return "";
-        auto path = fmt::format(fg(fmt::color::sky_blue) | fmt::emphasis::bold, "{}", failure.path);
-        return fmt::format("  {} {} [{}]: {}",
+        auto path   = fmt::format(fg(fmt::color::sky_blue) | fmt::emphasis::bold, "{}", failure.path);
+        auto detail = [&failure]() -> std::string {
+            if(not failure.detail.empty())
+                return fmt::format("\n\nExtra detail:\n---\n{}\n---\n", failure.detail);
+            return "";
+        }();
+        return fmt::format("  {} {} [{}]: {}{}",
             fmt::format(fg(fmt::color::red) | fmt::emphasis::bold, "-"),
-            this->operator()(failure.type), path, failure.message);
+            this->operator()(failure.type), path, failure.message, detail);
     }
 
     void operator()(FailureEvent const &ev) const {

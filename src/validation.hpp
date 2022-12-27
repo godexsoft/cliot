@@ -40,6 +40,37 @@ private:
                         incoming[key]);
                 }
             }
+        } else if(expectations.is_string()) {
+            // check our filters, like "$bool" should pass if the actual type received is a bool
+            auto val = expectations.get<std::string>();
+            if(val.starts_with("$")) {
+                auto passes = [&val, &incoming]() {
+                    if(val == "$bool") {
+                        return incoming.is_boolean();
+                    } else if(val == "$string") {
+                        return incoming.is_string();
+                    } else if(val == "$array") {
+                        return incoming.is_array();
+                    } else if(val == "$double") {
+                        return incoming.is_number_float();
+                    } else if(val == "$int") {
+                        return incoming.is_number_integer();
+                    } else if(val == "$uint") {
+                        return incoming.is_number_unsigned();
+                    } else if(val == "$object") {
+                        return incoming.is_object();
+                    } else {
+                        return val == incoming;
+                    }
+                }();
+
+                if(!passes) {
+                    std::stringstream ss;
+                    ss << expectations << " is not met for value '" << incoming << "'";
+                    add_issue(FailureEvent::Data::Type::TYPE_CHECK, path, ss.str());
+                }
+            }
+
         } else {
             if(expectations != incoming) {
                 std::stringstream ss;

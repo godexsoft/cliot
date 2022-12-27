@@ -34,18 +34,22 @@ struct FailureEvent : public MetaEvent {
         enum class Type {
             LOGIC_ERROR,
             NO_MATCH,
-            NOT_EQUAL
+            NOT_EQUAL,
+            TYPE_CHECK
         };
         Data(
             Type type,
             std::string const &path,
-            std::string const &message)
+            std::string const &message,
+            std::string const &detail = "")
             : type{ type }
             , path{ path }
-            , message{ message } { }
+            , message{ message }
+            , detail{ detail } { }
         Type type;
         std::string path;
         std::string message;
+        std::string detail;
     };
 
     FailureEvent(

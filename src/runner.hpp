@@ -91,15 +91,22 @@ public:
             inja::json data = store;
             data["$res"]    = incoming;
 
-            auto temp         = env_.get().parse_template(path_);
-            auto result       = env_.get().render(temp, data);
-            auto expectations = inja::json::parse(result);
+            auto temp   = env_.get().parse_template(path_);
+            auto result = env_.get().render(temp, data);
+            try {
+                auto expectations = inja::json::parse(result);
 
-            report(ResponseEvent{ path_, index_, incoming.dump(4), expectations.dump(4) });
-            auto [valid, issues] = validator_.validate(expectations, incoming);
+                report(ResponseEvent{ path_, index_, incoming.dump(4), expectations.dump(4) });
+                auto [valid, issues] = validator_.validate(expectations, incoming);
 
-            if(not valid)
+                if(not valid)
+                    throw FlowException(path_, issues, incoming.dump(4));
+            } catch(inja::json::exception const &e) {
+                auto const issues = std::vector<FailureEvent::Data>{
+                    { FailureEvent::Data::Type::LOGIC_ERROR, path_, e.what(), result }
+                };
                 throw FlowException(path_, issues, incoming.dump(4));
+            }
         } catch(inja::InjaError const &e) {
             auto const issues = std::vector<FailureEvent::Data>{
                 { FailureEvent::Data::Type::LOGIC_ERROR, path_, e.message }

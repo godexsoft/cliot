@@ -1,5 +1,7 @@
 {% set method = default(method, "unset") %}
 {
-    "method": "{{ method }}",
+    "method": "{{ method }}", 
+    {% block extensions %}
+    {% endblock %}
     "type": "request"
 }

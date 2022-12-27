@@ -11,5 +11,6 @@
     {% endif %}
     
     "status": "{{ status }}",
+    {% block extensions %}{% endblock %}
     "type": "response"
 }
