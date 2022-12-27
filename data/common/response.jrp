@@ -1,0 +1,15 @@
+{% set status = default(status, "success") %}
+{% set error = default(error, "unset") %}
+{% set error_code = default(error_code, 0) %}
+{% set error_message = default(error_message, "unset") %}
+
+{
+    {% if status == "error" %}
+        "error": "{{ error }}",
+        "error_code": {{ error_code }},
+        "error_message": "{{ error_message }}",
+    {% endif %}
+    
+    "status": "{{ status }}",
+    "type": "response"
+}
