@@ -11,13 +11,12 @@
 #include <queue>
 #include <set>
 
-template <typename RequestType, typename ResponseType, typename ReportRendererType>
+template <typename RequestType, typename ResponseType, typename ReportEngineType>
 class Crawler {
     // all deps needed for the crawler:
-    using env_t             = inja::Environment;
-    using reporting_t       = ReportEngine;
-    using report_renderer_t = ReportRendererType;
-    using services_t        = di::Deps<env_t, reporting_t, report_renderer_t>;
+    using env_t       = inja::Environment;
+    using reporting_t = ReportEngineType;
+    using services_t  = di::Deps<env_t, reporting_t>;
 
     using path_set_data_t = std::pair<std::string, std::filesystem::path>;
     using data_t          = std::pair<std::queue<RequestType>, std::queue<ResponseType>>;
@@ -75,8 +74,8 @@ private:
     }
 
     void report_detected(std::string const &name) {
-        auto const &[reporting, renderer] = services_.template get<reporting_t, report_renderer_t>();
-        reporting.get().record(SimpleEvent{ "DETECT FLOW", name }, renderer);
+        auto const &reporting = services_.template get<reporting_t>();
+        reporting.get().record(SimpleEvent{ "DETECT FLOW", name });
     }
 
     bool passes_filter(std::string_view flow_name) const {

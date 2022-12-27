@@ -11,7 +11,7 @@ if(NOT googletest_POPULATED)
 endif()
 
 target_compile_features(cliot_tests PUBLIC cxx_std_20)
-target_link_libraries(cliot_tests PUBLIC gmock_main crablib::crablib inja fmt)
+target_link_libraries(cliot_tests PUBLIC gmock_main crablib::crablib inja fmt di)
 target_include_directories(cliot_tests PRIVATE unittests src)
 
 enable_testing()

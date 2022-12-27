@@ -108,19 +108,22 @@ private:
     std::condition_variable cv_;
 };
 
+template <typename RendererType>
 class ReportEngine {
     AsyncQueue<AnyEvent> events_{ 500 };
+    std::reference_wrapper<const RendererType> renderer_;
     bool sync_output_;
 
 public:
-    ReportEngine(bool sync_output)
-        : sync_output_{ sync_output } {
+    ReportEngine(RendererType const &renderer, bool sync_output)
+        : renderer_{ std::cref(renderer) }
+        , sync_output_{ sync_output } {
     }
 
-    template <typename EventType, typename RendererType>
-    void record(EventType &&ev, RendererType const &renderer) {
+    template <typename EventType>
+    void record(EventType &&ev) {
         if(sync_output_)
-            renderer(ev);
-        events_.enqueue(AnyEvent{ std::move(ev), std::cref(renderer) });
+            renderer_.get()(ev);
+        events_.enqueue(AnyEvent{ std::move(ev), renderer_ });
     }
 };

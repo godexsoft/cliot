@@ -109,15 +109,14 @@ template <
     typename ConnectionManagerType,
     typename RequestType,
     typename ResponseType,
-    typename ReportRendererType>
+    typename ReportEngineType>
 class FlowRunner {
     // all services needed for the flow runner:
-    using env_t             = inja::Environment;
-    using store_t           = inja::json;
-    using con_man_t         = ConnectionManagerType;
-    using reporting_t       = ReportEngine;
-    using report_renderer_t = ReportRendererType;
-    using services_t        = di::Deps<env_t, store_t, con_man_t, reporting_t, report_renderer_t>;
+    using env_t       = inja::Environment;
+    using store_t     = inja::json;
+    using con_man_t   = ConnectionManagerType;
+    using reporting_t = ReportEngineType;
+    using services_t  = di::Deps<env_t, store_t, con_man_t, reporting_t>;
 
     services_t services_;
 
@@ -173,13 +172,13 @@ public:
 private:
     void
     report(std::string const &label, std::string const &message) {
-        auto const &[reporting, renderer] = services_.template get<reporting_t, report_renderer_t>();
-        reporting.get().record(SimpleEvent{ label, message }, renderer);
+        auto const &reporting = services_.template get<reporting_t>();
+        reporting.get().record(SimpleEvent{ label, message });
     }
 
     void
     report(auto &&ev) {
-        auto const &[reporting, renderer] = services_.template get<reporting_t, report_renderer_t>();
-        reporting.get().record(std::move(ev), renderer);
+        auto const &reporting = services_.template get<reporting_t>();
+        reporting.get().record(std::move(ev));
     }
 };

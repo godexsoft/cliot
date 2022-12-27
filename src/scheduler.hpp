@@ -19,19 +19,18 @@ template <
     typename ConnectionManagerType,
     typename RequestType,
     typename ResponseType,
-    typename ReportRendererType>
+    typename ReportEngineType>
 class Scheduler {
     // all services needed for the scheduler:
-    using env_t             = inja::Environment;
-    using store_t           = inja::json;
-    using con_man_t         = ConnectionManagerType;
-    using reporting_t       = ReportEngine;
-    using report_renderer_t = ReportRendererType;
-    using crawler_t         = Crawler<RequestType, ResponseType, report_renderer_t>;
-    using services_t        = di::Deps<env_t, store_t, con_man_t, reporting_t, report_renderer_t, crawler_t>;
+    using env_t       = inja::Environment;
+    using store_t     = inja::json;
+    using con_man_t   = ConnectionManagerType;
+    using reporting_t = ReportEngineType;
+    using crawler_t   = Crawler<RequestType, ResponseType, reporting_t>;
+    using services_t  = di::Deps<env_t, store_t, con_man_t, reporting_t, crawler_t>;
 
     services_t services_;
-    using flow_runner_t = FlowRunner<ConnectionManagerType, RequestType, ResponseType, report_renderer_t>;
+    using flow_runner_t = FlowRunner<ConnectionManagerType, RequestType, ResponseType, ReportEngineType>;
 
 public:
     Scheduler(services_t services)
@@ -39,7 +38,6 @@ public:
 
     void run() {
         auto const &reporting = services_.template get<reporting_t>();
-        auto const &renderer  = services_.template get<report_renderer_t>();
         auto flows            = services_.template get<crawler_t>().get().crawl();
         for(auto const &[name, flow] : flows) {
             try {
@@ -47,10 +45,10 @@ public:
                     services_, name, flow.first, flow.second
                 };
                 runner.run();
-                reporting.get().record(SuccessEvent{ name }, renderer);
+                reporting.get().record(SuccessEvent{ name });
 
             } catch(FlowException const &e) {
-                reporting.get().record(FailureEvent{ name, e.path, e.issues, e.response }, renderer);
+                reporting.get().record(FailureEvent{ name, e.path, e.issues, e.response });
             }
         }
     }
