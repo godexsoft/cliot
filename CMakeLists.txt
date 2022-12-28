@@ -24,7 +24,7 @@ include(CMake/deps/di.cmake)
 include(CMake/deps/cxxopts.cmake)
 include(CMake/deps/inja.cmake)
 include(CMake/deps/libfmt.cmake)
-include(CMake/deps/crablib.cmake)
+include(CMake/deps/boost.cmake)
 
 target_sources(cliot PRIVATE
   src/main.cpp

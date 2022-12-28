@@ -22,7 +22,8 @@ using store_t        = inja::json;
 using req_t       = Request;
 using resp_t      = Response<Validator>;
 using crawler_t   = Crawler<req_t, resp_t, rep_t>;
-using con_man_t   = ConnectionManager<OnDemandConnection>;
+using fetcher_t   = OnDemandFetcher;
+using con_man_t   = ConnectionManager<OnDemandConnection, fetcher_t>;
 using scheduler_t = Scheduler<con_man_t, req_t, resp_t, rep_t>;
 
 void usage(std::string msg) {
@@ -51,7 +52,7 @@ auto parse_options(int argc, char **argv) {
     return result;
 }
 
-void register_extensions(env_t &env, store_t &store, rep_t &reporting) {
+void register_extensions(env_t &env, store_t &store, rep_t &reporting, con_man_t &con_man) {
     auto store_cb = [&store](Arguments &args) {
         auto value = args.at(0)->get<inja::json>();
         auto var   = args.at(1)->get<std::string>();
@@ -66,6 +67,30 @@ void register_extensions(env_t &env, store_t &store, rep_t &reporting) {
         reporting.record(SimpleEvent{ "CUSTOM", value });
     };
     env.add_void_callback("report", 1, report_cb);
+
+    auto http_fetch_cb = [&store, &con_man, &reporting](Arguments &args) {
+        auto url = args.at(0)->get<std::string>();
+        auto var = args.at(1)->get<std::string>();
+
+        reporting.record(SimpleEvent{ "FETCH", url });
+        auto value = con_man.get(url);
+        if(not value.empty()) {
+            store[var] = value;
+        }
+    };
+    env.add_void_callback("fetch", 2, http_fetch_cb);
+
+    auto http_fetch_json_cb = [&store, &con_man, &reporting](Arguments &args) {
+        auto url = args.at(0)->get<std::string>();
+        auto var = args.at(1)->get<std::string>();
+
+        reporting.record(SimpleEvent{ "FETCH JSON", url + " into " + var });
+        auto value = con_man.post(url);
+        if(not value.empty()) {
+            store[var] = inja::json::parse(value);
+        }
+    };
+    env.add_void_callback("fetch_json", 2, http_fetch_json_cb);
 }
 
 int main(int argc, char **argv) try {
@@ -84,11 +109,13 @@ int main(int argc, char **argv) try {
     rep_renderer_t renderer{ verbose };
     rep_t reporting{ renderer, true };
 
+    fetcher_t fetcher{};
+
     di::Deps<env_t, rep_t, store_t> deps{ env, reporting, store };
-    con_man_t con_man{ host, port };
+    con_man_t con_man{ host, std::to_string(port), fetcher };
     crawler_t crawler{ deps, path, filter };
 
-    register_extensions(env, store, reporting);
+    register_extensions(env, store, reporting, con_man);
 
     // this nonsense should be just: di::extend(deps, con_man, crawler)
     // todo: find out why it does not work

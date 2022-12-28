@@ -61,11 +61,18 @@ public:
 
     template <typename ConnectionManagerType, typename ReportHelper>
     std::string perform(inja::json const &store, ConnectionManagerType &con_man, ReportHelper report) {
-        auto temp = env_.get().parse_template(path_);
-        auto res  = env_.get().render(temp, store);
+        try {
+            auto temp = env_.get().parse_template(path_);
+            auto res  = env_.get().render(temp, store);
 
-        report(RequestEvent{ path_, index_, store, inja::json::parse(res).dump(4) });
-        return con_man.send(std::move(res));
+            report(RequestEvent{ path_, index_, store, inja::json::parse(res).dump(4) });
+            return con_man.send(std::move(res));
+        } catch(std::exception const &e) {
+            auto const issues = std::vector<FailureEvent::Data>{
+                { FailureEvent::Data::Type::LOGIC_ERROR, path_, e.what() }
+            };
+            throw FlowException(path_, issues, "No data");
+        }
     }
 };
 
@@ -110,6 +117,11 @@ public:
         } catch(inja::InjaError const &e) {
             auto const issues = std::vector<FailureEvent::Data>{
                 { FailureEvent::Data::Type::LOGIC_ERROR, path_, e.message }
+            };
+            throw FlowException(path_, issues, incoming.dump(4));
+        } catch(std::exception const &e) {
+            auto const issues = std::vector<FailureEvent::Data>{
+                { FailureEvent::Data::Type::LOGIC_ERROR, path_, e.what() }
             };
             throw FlowException(path_, issues, incoming.dump(4));
         }

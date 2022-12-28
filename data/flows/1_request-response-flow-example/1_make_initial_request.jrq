@@ -1,1 +1,9 @@
+{# 
+    this can be used to fetch some json, for example to create accounts.
+    in this case it stores the parsed json in under the "amm" object in env:
+    {{ fetch_json("https://ammfaucet.devnet.rippletest.net/accounts", "amm") }}
+
+    now that we have stored it in env, we can use these easily:
+    {{ amm.account.secret }} etc. 
+#}
 {"method":"server_info"}
