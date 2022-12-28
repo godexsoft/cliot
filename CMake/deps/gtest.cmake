@@ -11,8 +11,8 @@ if(NOT googletest_POPULATED)
 endif()
 
 target_compile_features(cliot_tests PUBLIC cxx_std_20)
-target_link_libraries(cliot_tests PUBLIC gmock_main inja fmt di ${Boost_LIBRARIES})
-target_include_directories(cliot_tests PRIVATE unittests src ${Boost_INCLUDE_DIRS})
+target_link_libraries(cliot_tests PUBLIC gmock_main inja fmt di ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES})
+target_include_directories(cliot_tests PRIVATE unittests src ${Boost_INCLUDE_DIRS} ${OPENSSL_INCLUDE_DIR})
 
 enable_testing()
 
