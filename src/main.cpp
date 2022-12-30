@@ -19,12 +19,12 @@ using rep_renderer_t = DefaultReportRenderer;
 using rep_t          = ReportEngine<rep_renderer_t>;
 using store_t        = inja::json;
 
-using req_t       = Request;
-using resp_t      = Response<Validator>;
-using crawler_t   = Crawler<req_t, resp_t, rep_t>;
+using validator_t = Validator;
 using fetcher_t   = OnDemandFetcher;
 using con_man_t   = ConnectionManager<OnDemandConnection, fetcher_t>;
-using scheduler_t = Scheduler<con_man_t, req_t, resp_t, rep_t>;
+using flow_t      = Flow<con_man_t, rep_t, validator_t>;
+using crawler_t   = Crawler<flow_t>;
+using scheduler_t = Scheduler<flow_t, crawler_t>;
 
 void usage(std::string msg) {
     fmt::print("{}\nThe first positional argument must be a path to the data folder\n", msg);
@@ -72,7 +72,7 @@ void register_extensions(env_t &env, store_t &store, rep_t &reporting, con_man_t
         auto url = args.at(0)->get<std::string>();
         auto var = args.at(1)->get<std::string>();
 
-        reporting.record(SimpleEvent{ "FETCH", url });
+        reporting.record(SimpleEvent{ "FETCH", url + " into " + var });
         auto value = con_man.get(url);
         if(not value.empty()) {
             store[var] = value;
@@ -103,7 +103,7 @@ int main(int argc, char **argv) try {
 
     // this is some sort of context.. maybe wrap this all?
     env_t env;
-    store_t store = env.load_json("./data/environment.json");
+    store_t store = env.load_json((std::filesystem::path{ path } / "environment.json").string());
     // context end
 
     rep_renderer_t renderer{ verbose };
@@ -113,12 +113,12 @@ int main(int argc, char **argv) try {
 
     di::Deps<env_t, rep_t, store_t> deps{ env, reporting, store };
     con_man_t con_man{ host, std::to_string(port), fetcher };
-    crawler_t crawler{ deps, path, filter };
 
     register_extensions(env, store, reporting, con_man);
 
     // this nonsense should be just: di::extend(deps, con_man, crawler)
     // todo: find out why it does not work
+    crawler_t crawler{ di::combine(deps, di::Deps<con_man_t>{ con_man }), path, filter };
     scheduler_t scheduler(di::combine(deps, di::Deps<con_man_t, crawler_t>{ con_man, crawler }));
     scheduler.run();
 

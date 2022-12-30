@@ -1,5 +1,6 @@
 #pragma once
 
+#include <flow.hpp>
 #include <reporting.hpp>
 #include <runner.hpp>
 
@@ -11,22 +12,25 @@
 #include <queue>
 #include <set>
 
-template <typename RequestType, typename ResponseType, typename ReportEngineType>
+template <typename FlowType>
 class Crawler {
-    // all deps needed for the crawler:
-    using env_t       = inja::Environment;
-    using reporting_t = ReportEngineType;
-    using services_t  = di::Deps<env_t, reporting_t>;
+    using flow_t = FlowType;
+
+    // all services needed for the crawler and also required for flow:
+    using env_t       = typename flow_t::env_t;
+    using store_t     = typename flow_t::store_t;
+    using con_man_t   = typename flow_t::con_man_t;
+    using reporting_t = typename flow_t::reporting_t;
+    using services_t  = typename flow_t::services_t;
 
     using path_set_data_t = std::pair<std::string, std::filesystem::path>;
-    using data_t          = std::pair<std::queue<RequestType>, std::queue<ResponseType>>;
 
     services_t services_;
     std::filesystem::path path_;
     std::string filter_;
 
     std::set<path_set_data_t> paths_;     // all paths ordered
-    std::map<std::string, data_t> flows_; // key ordered by name; requests/responses queued in order
+    std::map<std::string, flow_t> flows_; // key ordered by name; steps queued in order
 
 public:
     Crawler(services_t services, std::filesystem::path path, std::string const &filter)
@@ -35,8 +39,7 @@ public:
         , filter_{ filter } { }
 
     auto crawl() {
-        auto const &env = services_.template get<env_t>();
-        auto path       = path_ / "flows";
+        auto path = path_ / "flows";
 
         if(not std::filesystem::exists(path))
             throw std::runtime_error("given path does not appear to be valid: missing 'flows' sub directory");
@@ -49,11 +52,10 @@ public:
             if(not is_passing_filter(flow_name))
                 continue;
 
-            auto candidate = path.extension();
-            if(candidate == ".jrq") {
-                flows_[flow_name].first.emplace(env, path.string());
-            } else if(candidate == ".jrp") {
-                flows_[flow_name].second.emplace(env, path.string());
+            if(path.filename() == "script.yaml") {
+                auto dir_path = path;
+                dir_path.remove_filename();
+                flows_.emplace(std::make_pair(flow_name, FlowType{ services_, dir_path }));
             }
         }
 

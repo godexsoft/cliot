@@ -1,9 +1,12 @@
 #include <gtest/gtest.h>
 
+#include <flow.hpp>
+#include <runner.hpp>
 #include <web.hpp>
 
 #include <fmt/color.h>
 #include <fmt/compile.h>
+#include <yaml-cpp/yaml.h>
 
 struct MockHandler {
     std::string host;
@@ -29,4 +32,34 @@ TEST(Cliot, ConnectionManagerTest) {
     EXPECT_EQ(man.send(R"({"method":"server_info"})"), "{data}");
     EXPECT_EQ(man.get("http://test.com"), "{data}");
     EXPECT_EQ(man.post("https://another.test.com/something"), "{data}");
+}
+
+TEST(Cliot, Yaml) {
+    std::string data = R"(---
+metadata:
+  subject: Example flow
+  description: This is an example request-response flow
+  author: Alex
+  created_on: 27 Dec 2022
+  last_update: 28 Dec 2022
+  revisions:
+  - First version
+  - Some modifications done
+steps:
+- type: response
+  file: response.j2
+- type: request
+  file: request.j2
+)";
+
+    YAML::Node doc = YAML::Load(data);
+
+    for(auto const &step : doc["steps"].as<std::vector<Step>>()) {
+        fmt::print("+ step: {} in {}\n", step.name, step.file);
+    }
+}
+
+TEST(Cliot, Flow) {
+    auto flow   = Flow<void, void>("/home/godexsoft/Development/cliot/data/flows/1_example");
+    auto runner = FlowRunner();
 }

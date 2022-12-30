@@ -1,0 +1,19 @@
+---
+metadata:
+  subject: Example flow
+  description: This is an example request-response flow
+  author: Alex
+  created_on: 27 Dec 2022
+  last_update: 28 Dec 2022
+  revisions:
+  - First version
+  - Some modifications done
+steps:
+- type: request
+  file: request1.json.j2
+- type: response
+  file: response1.json.j2
+- type: request
+  file: request2.json.j2
+- type: response
+  file: response2.json.j2
