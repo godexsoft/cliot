@@ -1,3 +1,0 @@
-{% set method = "bogus" %}
-
-{% include "../../common/request.jrq" %}
