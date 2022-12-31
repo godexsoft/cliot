@@ -90,7 +90,7 @@ struct DefaultReportRenderer {
 
         fmt::print(fg(fmt::color::ghost_white), "? | ");
         fmt::print(fg(fmt::color::pale_green) | fmt::emphasis::bold, "REQUEST ");
-        fmt::print(fg(fmt::color::sky_blue) | fmt::emphasis::bold, "{}: {}\n", ev.index, ev.path);
+        fmt::print(fg(fmt::color::sky_blue) | fmt::emphasis::bold, "{}\n", ev.path);
 
         fmt::print("Request data:\n---\n{}\n---\nStore state:\n---\n{}\n---\n",
             fmt::format(fg(fmt::color::sky_blue) | fmt::emphasis::italic, "{}", ev.data),
@@ -103,7 +103,7 @@ struct DefaultReportRenderer {
 
         fmt::print(fg(fmt::color::ghost_white), "? | ");
         fmt::print(fg(fmt::color::pale_green) | fmt::emphasis::bold, "RESPONSE ");
-        fmt::print(fg(fmt::color::sky_blue) | fmt::emphasis::bold, "{}: {}\n", ev.index, ev.path);
+        fmt::print(fg(fmt::color::sky_blue) | fmt::emphasis::bold, "{}\n", ev.path);
 
         fmt::print("Response:\n---\n{}\n---\nExpectations:\n---\n{}\n---\n",
             fmt::format(fg(fmt::color::sky_blue) | fmt::emphasis::italic, "{}", ev.response),

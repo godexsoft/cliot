@@ -35,6 +35,8 @@ public:
         auto flow_dirs        = services_.template get<crawler_t>().get().crawl();
         for(auto const &[name, dir] : flow_dirs) {
             try {
+                // the scheduler could run a thread pool and execute multiple runners concurrently.
+                // this is not really needed yet so leaving it as single threaded for now.
                 auto runner = flow_runner_t{
                     services_, name, dir
                 };

@@ -147,7 +147,7 @@ public:
                 auto temp                         = env.get().parse_template(path_);
                 auto res                          = env.get().render(temp, store);
 
-                report(RequestEvent{ path_, "index", store, inja::json::parse(res).dump(4) });
+                report(RequestEvent{ path_, store, inja::json::parse(res).dump(4) });
                 return con_man.get().send(std::move(res));
             } catch(std::exception const &e) {
                 auto const issues = std::vector<FailureEvent::Data>{
@@ -194,7 +194,7 @@ public:
                 try {
                     auto expectations = inja::json::parse(result);
 
-                    report(ResponseEvent{ path_, "index", incoming.dump(4), expectations.dump(4) });
+                    report(ResponseEvent{ path_, incoming.dump(4), expectations.dump(4) });
                     auto [valid, issues] = validator_.validate(expectations, incoming);
 
                     if(not valid)
@@ -336,6 +336,7 @@ public:
         : services_{ services } { }
 
     auto make(std::filesystem::path const &path, env_t &env, store_t &store) {
+        // we inject *this as the factory so that SubFlowRunner can benefit.
         return flow_t{
             di::combine(services_,
                 di::Deps<env_t, store_t, DefaultFlowFactory<con_man_t, reporting_t>>{ env, store, *this }),

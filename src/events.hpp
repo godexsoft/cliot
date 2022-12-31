@@ -71,16 +71,13 @@ struct FailureEvent : public MetaEvent {
 struct RequestEvent : public MetaEvent {
     RequestEvent(
         std::string const &path,
-        std::string const &index,
         inja::json const &store,
         std::string const &data)
         : MetaEvent{}
         , path{ path }
-        , index{ index }
         , store{ store }
         , data{ data } { }
     std::string path;
-    std::string index;
     inja::json store;
     std::string data;
 };
@@ -88,16 +85,13 @@ struct RequestEvent : public MetaEvent {
 struct ResponseEvent : public MetaEvent {
     ResponseEvent(
         std::string const &path,
-        std::string const &index,
         std::string const &response,
         std::string const &expectations)
         : MetaEvent{}
         , path{ path }
-        , index{ index }
         , response{ response }
         , expectations{ expectations } { }
     std::string path;
-    std::string index;
     std::string response;
     std::string expectations;
 };
