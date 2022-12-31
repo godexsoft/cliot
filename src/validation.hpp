@@ -1,11 +1,11 @@
 #pragma once
 
+#include <events.hpp>
+
 #include <fmt/compile.h>
 #include <inja/inja.hpp>
 
 #include <iostream>
-
-#include <events.hpp>
 
 class Validator {
     using issues_vec_t   = std::vector<FailureEvent::Data>;
