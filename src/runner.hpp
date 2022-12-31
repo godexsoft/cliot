@@ -24,38 +24,45 @@ struct overloaded : Ts... {
 template <class... Ts>
 overloaded(Ts...) -> overloaded<Ts...>;
 
-template <typename FlowType>
+template <typename FlowFactoryType>
 class FlowRunner {
-    using flow_t = FlowType;
-
-    // all services needed for the flow runner:
-    using env_t       = typename flow_t::env_t;
-    using store_t     = typename flow_t::store_t;
-    using con_man_t   = typename flow_t::con_man_t;
-    using reporting_t = typename flow_t::reporting_t;
-    using services_t  = typename flow_t::services_t;
+    using flow_factory_t = FlowFactoryType;
+    using flow_t         = typename flow_factory_t::flow_t;
+    using env_t          = typename flow_factory_t::env_t;
+    using store_t        = typename flow_factory_t::store_t;
+    using con_man_t      = typename flow_factory_t::con_man_t;
+    using reporting_t    = typename flow_factory_t::reporting_t;
+    using services_t     = di::Deps<flow_factory_t, reporting_t, con_man_t>;
 
     services_t services_;
     std::string name_;
-    flow_t flow_;
+    std::string path_;
     std::string last_response_;
 
 public:
     FlowRunner(
         services_t services,
         std::string_view name,
-        flow_t const &flow)
+        std::string_view path)
         : services_{ services }
         , name_{ name }
-        , flow_{ flow } { }
+        , path_{ path } { }
 
     void run() {
-        auto store  = services_.template get<store_t>();
-        store.get() = {}; // clean for each run
-
         report("RUNNING", name_);
 
-        for(auto steps = flow_.steps(); auto &step : steps) {
+        auto const &factory = services_.template get<flow_factory_t>();
+        env_t env;
+        store_t store;
+
+        auto env_json_path = (std::filesystem::path{ path_ } / "env.json").string();
+        if(std::filesystem::exists(env_json_path))
+            env.load_json(env_json_path);
+
+        register_extensions(env, store);
+        auto flow = factory.get().make(path_, env, store);
+
+        for(auto steps = flow.steps(); auto &step : steps) {
             // clang-format off
             std::visit( overloaded {
                 [this](typename flow_t::request_step_t& req) mutable {
@@ -73,15 +80,57 @@ public:
     }
 
 private:
-    void
-    report(std::string const &label, std::string const &message) {
+    void report(std::string const &label, std::string const &message) {
         auto const &reporting = services_.template get<reporting_t>();
         reporting.get().record(SimpleEvent{ label, message });
     }
 
-    void
-    report(auto &&ev) {
+    void report(auto &&ev) {
         auto const &reporting = services_.template get<reporting_t>();
         reporting.get().record(std::move(ev));
+    }
+
+    void register_extensions(env_t &env, store_t &store) {
+        auto store_cb = [&store](inja::Arguments &args) {
+            auto value = args.at(0)->get<inja::json>();
+            auto var   = args.at(1)->get<std::string>();
+
+            store[var] = value;
+            return value;
+        };
+        env.add_callback("store", 2, store_cb);
+
+        auto report_cb = [this](inja::Arguments &args) {
+            auto const &reporting = services_.template get<reporting_t>();
+            auto value            = args.at(0)->get<std::string>();
+            reporting.get().record(SimpleEvent{ "CUSTOM", value });
+        };
+        env.add_void_callback("report", 1, report_cb);
+
+        auto http_fetch_cb = [this, &store](inja::Arguments &args) {
+            auto const &[reporting, con_man] = services_.template get<reporting_t, con_man_t>();
+            auto url                         = args.at(0)->get<std::string>();
+            auto var                         = args.at(1)->get<std::string>();
+
+            reporting.get().record(SimpleEvent{ "FETCH", url + " into " + var });
+            auto value = con_man.get().get(url);
+            if(not value.empty()) {
+                store[var] = value;
+            }
+        };
+        env.add_void_callback("fetch", 2, http_fetch_cb);
+
+        auto http_fetch_json_cb = [this, &store](inja::Arguments &args) {
+            auto const &[reporting, con_man] = services_.template get<reporting_t, con_man_t>();
+            auto url                         = args.at(0)->get<std::string>();
+            auto var                         = args.at(1)->get<std::string>();
+
+            reporting.get().record(SimpleEvent{ "FETCH JSON", url + " into " + var });
+            auto value = con_man.get().post(url);
+            if(not value.empty()) {
+                store[var] = inja::json::parse(value);
+            }
+        };
+        env.add_void_callback("fetch_json", 2, http_fetch_json_cb);
     }
 };

@@ -12,16 +12,11 @@
 #include <queue>
 #include <set>
 
-template <typename FlowType>
+template <typename ReportEngineType>
 class Crawler {
-    using flow_t = FlowType;
-
     // all services needed for the crawler and also required for flow:
-    using env_t       = typename flow_t::env_t;
-    using store_t     = typename flow_t::store_t;
-    using con_man_t   = typename flow_t::con_man_t;
-    using reporting_t = typename flow_t::reporting_t;
-    using services_t  = typename flow_t::services_t;
+    using reporting_t = ReportEngineType;
+    using services_t  = di::Deps<reporting_t>;
 
     using path_set_data_t = std::pair<std::string, std::filesystem::path>;
 
@@ -29,8 +24,8 @@ class Crawler {
     std::filesystem::path path_;
     std::string filter_;
 
-    std::set<path_set_data_t> paths_;     // all paths ordered
-    std::map<std::string, flow_t> flows_; // key ordered by name; steps queued in order
+    std::set<path_set_data_t> paths_;          // all paths ordered
+    std::map<std::string, std::string> flows_; // ordered by name
 
 public:
     Crawler(services_t services, std::filesystem::path path, std::string const &filter)
@@ -55,7 +50,7 @@ public:
             if(path.filename() == "script.yaml") {
                 auto dir_path = path;
                 dir_path.remove_filename();
-                flows_.emplace(std::make_pair(flow_name, FlowType{ services_, dir_path }));
+                flows_.emplace(std::make_pair(flow_name, dir_path.string()));
             }
         }
 

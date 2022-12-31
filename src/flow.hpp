@@ -16,6 +16,7 @@
 #include <events.hpp>
 #include <reporting.hpp>
 #include <runner.hpp>
+#include <validation.hpp>
 #include <web.hpp>
 
 struct FlowException : public std::runtime_error {
@@ -118,7 +119,7 @@ struct convert<Step> {
 };
 }
 
-template <typename ConnectionManagerType, typename ReportEngineType, typename ValidatorType>
+template <typename ConnectionManagerType, typename ReportEngineType, typename ValidatorType, typename FlowFactoryType>
 class Flow {
 public:
     class RequestStep {
@@ -126,9 +127,7 @@ public:
         using store_t     = inja::json;
         using con_man_t   = ConnectionManagerType;
         using reporting_t = ReportEngineType;
-        using validator_t = ValidatorType;
         using services_t  = di::Deps<env_t, store_t, con_man_t, reporting_t>;
-        using flow_t      = Flow<con_man_t, reporting_t, validator_t>;
 
         services_t services_;
         std::string path_;
@@ -148,7 +147,7 @@ public:
                 auto temp                         = env.get().parse_template(path_);
                 auto res                          = env.get().render(temp, store);
 
-                // report(RequestEvent{ path_, "index", store, inja::json::parse(res).dump(4) });
+                report(RequestEvent{ path_, "index", store, inja::json::parse(res).dump(4) });
                 return con_man.get().send(std::move(res));
             } catch(std::exception const &e) {
                 auto const issues = std::vector<FailureEvent::Data>{
@@ -156,6 +155,13 @@ public:
                 };
                 throw FlowException(path_, issues, "No data");
             }
+        }
+
+    private:
+        void
+        report(auto &&ev) {
+            auto const &reporting = services_.template get<reporting_t>();
+            reporting.get().record(std::move(ev));
         }
     };
 
@@ -188,7 +194,7 @@ public:
                 try {
                     auto expectations = inja::json::parse(result);
 
-                    // report(ResponseEvent{ path_, "index", incoming.dump(4), expectations.dump(4) });
+                    report(ResponseEvent{ path_, "index", incoming.dump(4), expectations.dump(4) });
                     auto [valid, issues] = validator_.validate(expectations, incoming);
 
                     if(not valid)
@@ -211,17 +217,22 @@ public:
                 throw FlowException(path_, issues, incoming.dump(4));
             }
         }
+
+    private:
+        void
+        report(auto &&ev) {
+            auto const &reporting = services_.template get<reporting_t>();
+            reporting.get().record(std::move(ev));
+        }
     };
 
     class RunFlowStep {
-        // all requirements are for FlowRunner
-        using env_t       = inja::Environment;
-        using store_t     = inja::json;
-        using con_man_t   = ConnectionManagerType;
-        using reporting_t = ReportEngineType;
-        using services_t  = di::Deps<env_t, store_t, con_man_t, reporting_t>;
-
-        using flow_t = Flow<con_man_t, reporting_t, ValidatorType>;
+        using env_t          = inja::Environment;
+        using store_t        = inja::json;
+        using con_man_t      = ConnectionManagerType;
+        using reporting_t    = ReportEngineType;
+        using flow_factory_t = FlowFactoryType;
+        using services_t     = di::Deps<env_t, store_t, con_man_t, reporting_t, flow_factory_t>;
 
         services_t services_;
         std::string path_;
@@ -237,10 +248,10 @@ public:
 
         void run() {
             try {
-                auto runner = FlowRunner<flow_t>{
-                    services_, fmt::format("subflow[{}]", path_), flow_t{ services_, path_ }
-                };
-                runner.run();
+                // auto runner = FlowRunner<flow_t>{
+                //     services_, fmt::format("subflow[{}]", path_), path_
+                // };
+                // runner.run();
             } catch(FlowException const &e) {
                 auto issues = std::vector<FailureEvent::Data>{
                     { FailureEvent::Data::Type::LOGIC_ERROR, path_, "Subflow execution failed" }
@@ -252,11 +263,14 @@ public:
     };
 
 public:
-    using env_t       = inja::Environment;
-    using store_t     = inja::json;
-    using con_man_t   = ConnectionManagerType;
-    using reporting_t = ReportEngineType;
-    using services_t  = di::Deps<env_t, store_t, con_man_t, reporting_t>;
+    using env_t          = inja::Environment;
+    using store_t        = inja::json;
+    using con_man_t      = ConnectionManagerType;
+    using reporting_t    = ReportEngineType;
+    using validator_t    = ValidatorType;
+    using flow_factory_t = FlowFactoryType;
+    using flow_t         = Flow<con_man_t, reporting_t, validator_t, flow_factory_t>;
+    using services_t     = di::Deps<env_t, store_t, con_man_t, reporting_t, flow_factory_t>;
 
     using request_step_t  = RequestStep;
     using response_step_t = ResponseStep;
@@ -285,7 +299,8 @@ public:
 private:
     void load() {
         auto script_path = path_ / "script.yaml";
-        YAML::Node doc   = YAML::LoadFile(script_path.string());
+        assert(std::filesystem::exists(script_path));
+        YAML::Node doc = YAML::LoadFile(script_path.string());
 
         for(auto const &step : doc["steps"].as<std::vector<Step>>()) {
             switch(step.type) {
@@ -303,4 +318,30 @@ private:
             }
         }
     }
+};
+
+template <typename ConnectionManagerType, typename ReportEngineType>
+class DefaultFlowFactory {
+public:
+    using env_t       = inja::Environment;
+    using store_t     = inja::json;
+    using con_man_t   = ConnectionManagerType;
+    using reporting_t = ReportEngineType;
+    using flow_t      = Flow<con_man_t, reporting_t, Validator, DefaultFlowFactory<con_man_t, reporting_t>>;
+
+    using services_t = di::Deps<con_man_t, reporting_t>;
+
+    DefaultFlowFactory(services_t services)
+        : services_{ services } { }
+
+    auto make(std::filesystem::path const &path, env_t &env, store_t &store) {
+        return flow_t{
+            di::combine(services_,
+                di::Deps<env_t, store_t, DefaultFlowFactory<con_man_t, reporting_t>>{ env, store, *this }),
+            path
+        };
+    }
+
+private:
+    services_t services_;
 };

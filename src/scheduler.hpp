@@ -15,20 +15,16 @@
 #include <string_view>
 #include <vector>
 
-template <typename FlowType, typename CrawlerType>
+template <typename FlowFactoryType, typename ConnectionManagerType, typename ReportEngineType, typename CrawlerType>
 class Scheduler {
-    using flow_t = FlowType;
-
-    // all services needed for the scheduler:
-    using env_t       = typename flow_t::env_t;
-    using store_t     = typename flow_t::store_t;
-    using con_man_t   = typename flow_t::con_man_t;
-    using reporting_t = typename flow_t::reporting_t;
-    using crawler_t   = CrawlerType;
-    using services_t  = di::Deps<env_t, store_t, con_man_t, reporting_t, crawler_t>;
+    using flow_factory_t = FlowFactoryType;
+    using con_man_t      = ConnectionManagerType;
+    using reporting_t    = ReportEngineType;
+    using crawler_t      = CrawlerType;
+    using services_t     = di::Deps<flow_factory_t, reporting_t, con_man_t, crawler_t>;
 
     services_t services_;
-    using flow_runner_t = FlowRunner<flow_t>;
+    using flow_runner_t = FlowRunner<flow_factory_t>;
 
 public:
     Scheduler(services_t services)
@@ -36,11 +32,11 @@ public:
 
     void run() {
         auto const &reporting = services_.template get<reporting_t>();
-        auto flows            = services_.template get<crawler_t>().get().crawl();
-        for(auto const &[name, flow] : flows) {
+        auto flow_dirs        = services_.template get<crawler_t>().get().crawl();
+        for(auto const &[name, dir] : flow_dirs) {
             try {
                 auto runner = flow_runner_t{
-                    services_, name, flow
+                    services_, name, dir
                 };
                 runner.run();
                 reporting.get().record(SuccessEvent{ name });
