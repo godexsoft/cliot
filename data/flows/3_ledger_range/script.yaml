@@ -1,12 +1,13 @@
 ---
 metadata:
-  subject: Ledger range parsing
+  subject: Ledger range parsing (and subflow call example)
   description: This is an example request-response flow
   author: Alex
   created_on: 29 Dec 2022
-  last_update: 29 Dec 2022
+  last_update: 31 Dec 2022
   revisions:
   - First version
+  - Add subflow example
 steps:
 - type: run_flow
   name: 2_multiple

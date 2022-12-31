@@ -54,7 +54,7 @@ public:
 
         auto env_json_path = (std::filesystem::path{ path_ } / "env.json").string();
         if(std::filesystem::exists(env_json_path))
-            env.load_json(env_json_path);
+            store = env.load_json(env_json_path);
 
         register_extensions(env, store);
         run(env, store);
