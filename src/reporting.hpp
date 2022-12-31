@@ -1,5 +1,6 @@
 #pragma once
 
+#include <di.hpp>
 #include <fmt/color.h>
 #include <fmt/compile.h>
 
@@ -111,55 +112,22 @@ struct DefaultReportRenderer {
     }
 };
 
-template <typename T>
-class AsyncQueue {
-public:
-    AsyncQueue(const size_t capacity)
-        : capacity_{ capacity } {
-    }
-
-    void enqueue(T element) {
-        std::unique_lock l{ mtx_ };
-        cv_.wait(l, [this] { return q_.size() < capacity_; });
-        q_.push(std::move(element));
-        cv_.notify_all();
-    }
-
-    T dequeue() {
-        std::unique_lock l{ mtx_ };
-        cv_.wait(l, [this] { return !q_.empty(); });
-        T value = std::move(q_.front());
-        q_.pop();
-
-        l.unlock();
-        cv_.notify_all();
-        return value;
-    }
-
-private:
-    size_t capacity_;
-    std::queue<T> q_;
-
-    mutable std::mutex mtx_;
-    std::condition_variable cv_;
-};
-
 template <typename RendererType>
 class ReportEngine {
-    AsyncQueue<AnyEvent> events_{ 500 };
-    std::reference_wrapper<const RendererType> renderer_;
+    using services_t = di::Deps<RendererType>;
+
+    services_t services_;
     bool sync_output_;
 
 public:
-    ReportEngine(RendererType const &renderer, bool sync_output)
-        : renderer_{ std::cref(renderer) }
+    ReportEngine(services_t services, bool sync_output)
+        : services_{ services }
         , sync_output_{ sync_output } {
     }
 
     template <typename EventType>
     void record(EventType &&ev) {
         if(sync_output_)
-            renderer_.get()(ev);
-        events_.enqueue(AnyEvent{ std::move(ev), renderer_ });
+            services_.template get<RendererType>().get()(ev);
     }
 };

@@ -51,7 +51,8 @@ int main(int argc, char **argv) try {
     auto verbose = result["verbose"].as<uint16_t>();
 
     rep_renderer_t renderer{ verbose };
-    reporting_t reporting{ renderer, true };
+    auto reporting_deps = di::Deps<rep_renderer_t>{ renderer };
+    reporting_t reporting{ reporting_deps, true };
 
     di::Deps<reporting_t> base_deps{ reporting };
 
