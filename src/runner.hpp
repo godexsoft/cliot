@@ -49,9 +49,6 @@ public:
         , path_{ path } { }
 
     void run() {
-        report("RUNNING", name_);
-
-        auto const &factory = services_.template get<flow_factory_t>();
         env_t env;
         store_t store;
 
@@ -60,7 +57,14 @@ public:
             env.load_json(env_json_path);
 
         register_extensions(env, store);
-        auto flow = factory.get().make(path_, env, store);
+        run(env, store);
+    }
+
+    void run(env_t &env, store_t &store) {
+        report("RUNNING", name_);
+
+        auto const &factory = services_.template get<flow_factory_t>();
+        auto flow           = factory.get().make(path_, env, store);
 
         for(auto steps = flow.steps(); auto &step : steps) {
             // clang-format off

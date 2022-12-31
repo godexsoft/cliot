@@ -9,8 +9,6 @@ metadata:
   - First version
   - Some modifications done
 steps:
-- type: run_flow
-  name: 2_multiple
 - type: request
   file: request.json.j2
 - type: response

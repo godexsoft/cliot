@@ -8,6 +8,8 @@ metadata:
   revisions:
   - First version
 steps:
+- type: run_flow
+  name: 2_multiple
 - type: request
   file: request1.json.j2
 - type: response

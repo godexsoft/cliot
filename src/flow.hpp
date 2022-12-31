@@ -186,8 +186,8 @@ public:
 
         void validate(inja::json const &incoming) {
             try {
-                auto [env, store]   = services_.template get<env_t, store_t>();
-                store.get()["$res"] = incoming;
+                auto const &[env, store] = services_.template get<env_t, store_t>();
+                store.get()["$res"]      = incoming;
 
                 auto temp   = env.get().parse_template(path_);
                 auto result = env.get().render(temp, store);
@@ -248,10 +248,11 @@ public:
 
         void run() {
             try {
-                // auto runner = FlowRunner<flow_t>{
-                //     services_, fmt::format("subflow[{}]", path_), path_
-                // };
-                // runner.run();
+                auto const &[env, store] = services_.template get<env_t, store_t>();
+                auto runner              = FlowRunner<flow_factory_t>{
+                    services_, fmt::format("subflow[{}]", path_), path_
+                };
+                runner.run(env.get(), store.get());
             } catch(FlowException const &e) {
                 auto issues = std::vector<FailureEvent::Data>{
                     { FailureEvent::Data::Type::LOGIC_ERROR, path_, "Subflow execution failed" }
