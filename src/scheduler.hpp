@@ -30,7 +30,7 @@ public:
     Scheduler(services_t services)
         : services_{ services } { }
 
-    void run() {
+    int run() {
         auto const &reporting = services_.template get<reporting_t>();
         auto flow_dirs        = services_.template get<crawler_t>().get().crawl();
         for(auto const &[name, dir] : flow_dirs) {
@@ -45,5 +45,7 @@ public:
                 reporting.get().record(FailureEvent{ name, e.path, e.issues, e.response });
             }
         }
+
+        return EXIT_SUCCESS;
     }
 };

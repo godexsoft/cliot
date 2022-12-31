@@ -7,23 +7,12 @@
 #include <cxxopts.hpp>
 #include <di.hpp>
 #include <fmt/compile.h>
-#include <inja/inja.hpp>
 
-#include <filesystem>
-#include <iostream>
-
-using namespace inja;
-
-using env_t          = inja::Environment;
 using rep_renderer_t = DefaultReportRenderer;
 using reporting_t    = ReportEngine<rep_renderer_t>;
-using store_t        = inja::json;
-
-using validator_t    = Validator;
 using fetcher_t      = OnDemandFetcher;
 using con_man_t      = ConnectionManager<OnDemandConnection, fetcher_t>;
 using flow_factory_t = DefaultFlowFactory<con_man_t, reporting_t>;
-using flow_t         = Flow<con_man_t, reporting_t, validator_t, flow_factory_t>;
 using crawler_t      = Crawler<reporting_t>;
 using scheduler_t    = Scheduler<flow_factory_t, con_man_t, reporting_t, crawler_t>;
 
@@ -64,22 +53,20 @@ int main(int argc, char **argv) try {
     rep_renderer_t renderer{ verbose };
     reporting_t reporting{ renderer, true };
 
+    di::Deps<reporting_t> base_deps{ reporting };
+
     fetcher_t fetcher{};
-
-    di::Deps<reporting_t> deps{ reporting };
     con_man_t con_man{ host, std::to_string(port), fetcher };
+    crawler_t crawler{ base_deps, path, filter };
 
-    crawler_t crawler{ deps, path, filter };
-
-    auto flow_deps = di::combine(deps, di::Deps<con_man_t>{ con_man });
+    auto flow_deps = di::combine(base_deps, di::Deps<con_man_t>{ con_man });
     flow_factory_t flow_factory{ flow_deps };
 
     // todo: find out why di::extend() does not work
     auto scheduler_deps = di::combine(flow_deps, di::Deps<flow_factory_t, crawler_t>{ flow_factory, crawler });
     scheduler_t scheduler{ scheduler_deps };
-    scheduler.run();
 
-    return EXIT_SUCCESS;
+    return scheduler.run();
 } catch(std::exception const &e) {
     fmt::print("{}\n", e.what());
     return EXIT_FAILURE;
