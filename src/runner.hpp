@@ -77,6 +77,9 @@ public:
                 },
                 [](typename flow_t::run_flow_step_t& subflow) {
                     subflow.run();
+                },
+                [](typename flow_t::repeat_block_step_t& block) {
+                    block.run();
                 }},
             step);
             // clang-format on
@@ -84,7 +87,8 @@ public:
     }
 
 private:
-    void report(std::string const &label, std::string const &message) {
+    void
+    report(std::string const &label, std::string const &message) {
         auto const &reporting = services_.template get<reporting_t>();
         reporting.get().record(SimpleEvent{ label, message });
     }

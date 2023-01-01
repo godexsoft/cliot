@@ -1,0 +1,83 @@
+{
+    "result": {
+        "info": {
+            "cache": {
+                "is_full": "$bool",
+                "latest_ledger_seq": "$uint",
+                "object_hit_rate": "$double",
+                "size": "$uint",
+                "successor_hit_rate": "$double"
+            },
+            "clio_version": "$string",
+            "complete_ledgers": "$string",
+            "counters": {
+                "rpc": {
+                    "ledger_entry": {
+                        "duration_us": "$string",
+                        "errored": "$string",
+                        "finished": "$string",
+                        "forwarded": "$string",
+                        "started": "$string"
+                    },
+                    "ledger_range": {
+                        "duration_us": "$string",
+                        "errored": "$string",
+                        "finished": "$string",
+                        "forwarded": "$string",
+                        "started": "$string"
+                    },
+                    "server_info": {
+                        "duration_us": "$string",
+                        "errored": "$string",
+                        "finished": "$string",
+                        "forwarded": "$string",
+                        "started": "$string"
+                    },
+                    "subscribe": {
+                        "duration_us": "$string",
+                        "errored": "$string",
+                        "finished": "$string",
+                        "forwarded": "$string",
+                        "started": "$string"
+                    }
+                },
+                "subscriptions": {
+                    "account": "$uint",
+                    "accounts_proposed": "$uint",
+                    "book_changes": "$uint",
+                    "books": "$uint",
+                    "ledger": "$uint",
+                    "manifests": "$uint",
+                    "transactions": "$uint",
+                    "transactions_proposed": "$uint",
+                    "validations": "$uint"
+                },
+                "work_queue": {
+                    "current_queue_size": "$uint",
+                    "max_queue_size": "$uint",
+                    "queued": "$uint",
+                    "queued_duration_us": "$uint"
+                }
+            },
+            "etl": {
+                "is_writer": "$bool",
+                "last_publish_age_seconds": "$string",
+                "read_only": "$bool"
+            },
+            "load_factor": "$uint",
+            "rippled_version": "$string",
+            "validated_ledger": {
+                "age": "$uint",
+                "base_fee_xrp": "$double",
+                "hash": "$string",
+                "reserve_base_xrp": "$double",
+                "reserve_inc_xrp": "$double",
+                "seq": "$uint"
+            },
+            "validation_quorum": "$uint"
+        },
+        "validated": true
+    },
+    "status": "success",
+    "type": "response"
+}

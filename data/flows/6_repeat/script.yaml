@@ -1,0 +1,17 @@
+---
+metadata:
+  subject: Repeat block usage example
+  description: This is an example flow utilizing repeat blocks
+  author: Alex
+  created_on: 1 Jan 2023
+  last_update: 1 Jan 2023
+  revisions:
+  - First version
+steps:
+- type: block
+  repeat: 100 # repeat steps 100 times
+  steps:
+  - type: request
+    file: request.json.j2
+  - type: response
+    file: response.json.j2

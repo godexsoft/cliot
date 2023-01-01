@@ -46,33 +46,21 @@ struct Step {
         REQUEST,
         RESPONSE,
         RUN_FLOW,
-        INJECT
+        INJECT,
+        REPEAT_BLOCK,
     };
 
     Type type = Type::INVALID_TYPE;
     std::string name;
     YAML::Node data;
     std::string file;
+    std::optional<std::vector<Step>> steps;
+    std::optional<uint32_t> repeat; // only for block step
 };
 
 namespace YAML {
 template <>
 struct convert<Step::Type> {
-    static Node encode(const Step::Type &rhs) {
-        switch(rhs) {
-        case Step::Type::REQUEST:
-            return Node{ "request" };
-        case Step::Type::RESPONSE:
-            return Node{ "response" };
-        case Step::Type::RUN_FLOW:
-            return Node{ "run_flow" };
-        case Step::Type::INJECT:
-            return Node{ "inject" };
-        case Step::Type::INVALID_TYPE:
-            throw std::runtime_error("Invalid step type detected");
-        }
-    }
-
     static bool decode(const Node &node, Step::Type &rhs) {
         if(not node.IsScalar())
             return false;
@@ -85,6 +73,8 @@ struct convert<Step::Type> {
             rhs = Step::Type::RUN_FLOW;
         else if(type == "inject")
             rhs = Step::Type::INJECT;
+        else if(type == "block")
+            rhs = Step::Type::REPEAT_BLOCK;
         else
             return false;
         return true;
@@ -93,15 +83,6 @@ struct convert<Step::Type> {
 
 template <>
 struct convert<Step> {
-    static Node encode(const Step &rhs) {
-        Node node;
-        node["type"] = rhs.type;
-        node["name"] = rhs.name;
-        node["file"] = rhs.file;
-        node["data"] = rhs.data;
-        return node;
-    }
-
     static bool decode(const Node &node, Step &rhs) {
         if(not node.IsMap())
             return false;
@@ -113,6 +94,10 @@ struct convert<Step> {
             rhs.file = node["file"].as<std::string>();
         if(node["data"])
             rhs.data = node["data"];
+        if(node["repeat"])
+            rhs.repeat = node["repeat"].as<uint32_t>();
+        if(node["steps"])
+            rhs.steps = node["steps"].as<std::vector<Step>>();
 
         return true;
     }
@@ -240,8 +225,7 @@ public:
     public:
         RunFlowStep(services_t services, std::filesystem::path const &path)
             : services_{ services }
-            , path_{ path.string() } {
-        }
+            , path_{ path.string() } { }
 
         RunFlowStep(RunFlowStep &&)      = default;
         RunFlowStep(RunFlowStep const &) = default;
@@ -263,6 +247,65 @@ public:
         }
     };
 
+    class RepeatBlockStep {
+        using env_t          = inja::Environment;
+        using store_t        = inja::json;
+        using con_man_t      = ConnectionManagerType;
+        using reporting_t    = ReportEngineType;
+        using flow_factory_t = FlowFactoryType;
+        using services_t     = di::Deps<env_t, store_t, con_man_t, reporting_t, flow_factory_t>;
+
+        services_t services_;
+        std::filesystem::path path_;
+        uint32_t repeat_;
+        std::vector<Step> steps_;
+
+    public:
+        RepeatBlockStep(services_t services, std::filesystem::path const &path, uint32_t repeat, std::vector<Step> const &steps)
+            : services_{ services }
+            , path_{ path }
+            , repeat_{ repeat }
+            , steps_{ steps } { }
+
+        RepeatBlockStep(RepeatBlockStep &&)      = default;
+        RepeatBlockStep(RepeatBlockStep const &) = default;
+
+        void run() {
+            for(uint32_t i = 0; i < repeat_; ++i) {
+                // todo: this should be a custom event
+                report(SimpleEvent{ "REPEAT", fmt::format("[{}] Running all steps in block", i + 1) });
+                std::string last_response_;
+
+                // not sure i like that we essentially re-implemented both runner and Flow::load here
+                for(auto const &step : steps_) {
+                    switch(step.type) {
+                    case Step::Type::REQUEST:
+                        last_response_ = RequestStep{ services_, path_ / step.file }.perform();
+                        break;
+                    case Step::Type::RESPONSE:
+                        ResponseStep{ services_, path_ / step.file }.validate(inja::json::parse(last_response_));
+                        break;
+                    case Step::Type::RUN_FLOW:
+                        RunFlowStep{ services_, path_.parent_path().parent_path() / step.name }.run();
+                        break;
+                    case Step::Type::REPEAT_BLOCK:
+                        RepeatBlockStep{ services_, path_, step.repeat.value_or(1), step.steps.value() }.run();
+                        break;
+                    default:
+                        break;
+                    }
+                }
+            }
+        }
+
+    private:
+        void
+        report(auto &&ev) {
+            auto const &reporting = services_.template get<reporting_t>();
+            reporting.get().record(std::move(ev));
+        }
+    };
+
 public:
     using env_t          = inja::Environment;
     using store_t        = inja::json;
@@ -273,11 +316,12 @@ public:
     using flow_t         = Flow<con_man_t, reporting_t, validator_t, flow_factory_t>;
     using services_t     = di::Deps<env_t, store_t, con_man_t, reporting_t, flow_factory_t>;
 
-    using request_step_t  = RequestStep;
-    using response_step_t = ResponseStep;
-    using run_flow_step_t = RunFlowStep;
+    using request_step_t      = RequestStep;
+    using response_step_t     = ResponseStep;
+    using run_flow_step_t     = RunFlowStep;
+    using repeat_block_step_t = RepeatBlockStep;
 
-    using step_t = std::variant<request_step_t, response_step_t, run_flow_step_t>;
+    using step_t = std::variant<request_step_t, response_step_t, run_flow_step_t, repeat_block_step_t>;
 
 private:
     services_t services_;
@@ -313,6 +357,9 @@ private:
                 break;
             case Step::Type::RUN_FLOW:
                 steps_.push_back(RunFlowStep{ services_, path_.parent_path().parent_path() / step.name });
+                break;
+            case Step::Type::REPEAT_BLOCK:
+                steps_.push_back(RepeatBlockStep{ services_, path_, step.repeat.value_or(1), step.steps.value() });
                 break;
             default:
                 break;
