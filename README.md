@@ -89,7 +89,7 @@ Other than what `inja` already supports Cliot is adding the following extensions
 Used to store a value from the environment under a different key in the same environment while returning the value.
 Example `response.json.j2`:
 
-```json
+```jinja
 {"version": "{{ store($res.version, "VERSION") }}"}
 ```
 
@@ -108,7 +108,7 @@ This of course validates fine because the strings are simply compared for equali
 Used to fetch some JSON from an external endpoint, parse it and inject into the environment.
 Example `request.json.j2`:
 
-```json
+```jinja
 {% fetch_json("https://ammfaucet.devnet.rippletest.net/accounts", "amm") %}
 {"secret": "{{ amm.account.secret }}"}
 ```
@@ -125,7 +125,7 @@ Exactly like `fetch_json` but performs a `GET` request and does not parse anythi
 Can be used to report any custom message which will be output to the console or potentially end up in a report.
 Example:
 
-```json
+```jinja
 {% report("Test response [some.response.path]: " + $res.some.response.path) %}
 ```
 
