@@ -29,11 +29,13 @@ include(CMake/deps/boost.cmake)
 
 target_sources(cliot PRIVATE
   src/main.cpp
+  src/util/parse_uri.cpp
 )
 
 if(BUILD_TESTS)
   add_executable(cliot_tests
     unittests/test.cpp
+    unittests/web_tests.cpp
   )
   include(CMake/deps/gtest.cmake)
 endif()

@@ -3,8 +3,8 @@
 #include <di.hpp>
 #include <fmt/compile.h>
 #include <inja/inja.hpp>
+#include <util/parse_uri.hpp>
 
-#include <boost/algorithm/string.hpp>
 #include <boost/asio/connect.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/ssl/error.hpp>
@@ -129,34 +129,6 @@ struct OnDemandConnection {
     }
 };
 
-// taken from https://github.com/boostorg/beast/issues/787 as a workaround of not having boost.url
-struct ParsedURI {
-    std::string protocol;
-    std::string domain; // only domain must be present
-    std::string port;
-    std::string resource;
-    std::string query; // everything after '?', possibly nothing
-};
-
-ParsedURI parse_uri(const std::string &url) {
-    ParsedURI result;
-    auto value_or = [](const std::string &value, std::string &&deflt) -> std::string {
-        return (value.empty() ? deflt : value);
-    };
-    static const std::regex PARSE_URL{ R"((([httpsw]{2,5})://)?([^/ :]+)(:(\d+))?(/([^ ?]+)?)?/?\??([^/ ]+\=[^/ ]+)?)",
-        std::regex_constants::ECMAScript | std::regex_constants::icase };
-    std::smatch match;
-    if(std::regex_match(url, match, PARSE_URL) && match.size() == 9) {
-        result.protocol               = value_or(boost::algorithm::to_lower_copy(std::string(match[2])), "http");
-        result.domain                 = match[3];
-        const bool is_sequre_protocol = (result.protocol == "https" || result.protocol == "wss");
-        result.port                   = value_or(match[5], (is_sequre_protocol) ? "443" : "80");
-        result.resource               = value_or(match[6], "/");
-        result.query                  = match[8];
-    }
-    return result;
-}
-
 // a very inefficient, sync implementation of get and post http requests
 class OnDemandFetcher {
 public:
@@ -178,7 +150,7 @@ private:
         using tcp       = net::ip::tcp;
 
         try {
-            auto uri          = parse_uri(url);
+            auto uri          = util::parse_uri(url);
             auto const host   = uri.domain;
             auto const port   = uri.port;
             auto const target = uri.resource;

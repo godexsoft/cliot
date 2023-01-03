@@ -8,6 +8,7 @@
 
 #include <filesystem>
 #include <iostream>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -176,6 +177,7 @@ public:
 
                 auto temp   = env.get().parse_template(path_);
                 auto result = env.get().render(temp, store);
+
                 try {
                     auto expectations = inja::json::parse(result);
 
@@ -188,17 +190,23 @@ public:
                     auto const issues = std::vector<FailureEvent::Data>{
                         { FailureEvent::Data::Type::LOGIC_ERROR, path_, e.what(), result }
                     };
+
                     throw FlowException(path_, issues, incoming.dump(4));
                 }
             } catch(inja::InjaError const &e) {
                 auto const issues = std::vector<FailureEvent::Data>{
                     { FailureEvent::Data::Type::LOGIC_ERROR, path_, e.message }
                 };
+
                 throw FlowException(path_, issues, incoming.dump(4));
+            } catch(FlowException const &e) {
+                // just rethrow inner one
+                throw e;
             } catch(std::exception const &e) {
                 auto const issues = std::vector<FailureEvent::Data>{
                     { FailureEvent::Data::Type::LOGIC_ERROR, path_, e.what() }
                 };
+
                 throw FlowException(path_, issues, incoming.dump(4));
             }
         }
