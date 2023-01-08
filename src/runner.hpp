@@ -32,12 +32,12 @@ class FlowRunner {
     using store_t        = typename flow_factory_t::store_t;
     using con_man_t      = typename flow_factory_t::con_man_t;
     using reporting_t    = typename flow_factory_t::reporting_t;
+    using link_ptr_t     = typename con_man_t::link_ptr_t;
     using services_t     = di::Deps<flow_factory_t, reporting_t, con_man_t>;
 
     services_t services_;
     std::string name_;
     std::string path_;
-    std::string last_response_;
 
 public:
     FlowRunner(
@@ -63,17 +63,20 @@ public:
     void run(env_t &env, store_t &store) {
         report("RUNNING", name_);
 
-        auto const &factory = services_.template get<flow_factory_t>();
-        auto flow           = factory.get().make(path_, env, store);
+        auto const &factory  = services_.template get<flow_factory_t>();
+        auto flow            = factory.get().make(path_, env, store);
+        auto connection_link = link_ptr_t{};
 
         for(auto steps = flow.steps(); auto &step : steps) {
             // clang-format off
             std::visit( overloaded {
-                [this](typename flow_t::request_step_t& req) mutable {
-                    last_response_ = req.perform();
+                [&connection_link](typename flow_t::request_step_t& req) mutable {
+                    connection_link = req.perform(); // round robin ws on each new request
                 },
-                [this](typename flow_t::response_step_t& resp) {
-                    resp.validate(inja::json::parse(last_response_));
+                [&connection_link](typename flow_t::response_step_t& resp) {
+                    if(not connection_link)
+                        throw std::logic_error{ "Response can't come before Request step" };
+                    resp.validate(inja::json::parse(connection_link->read_one()));
                 },
                 [](typename flow_t::run_flow_step_t& subflow) {
                     subflow.run();

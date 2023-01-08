@@ -127,14 +127,14 @@ public:
         RequestStep(RequestStep &&)      = default;
         RequestStep(RequestStep const &) = default;
 
-        std::string perform() {
+        auto perform() {
             try {
                 auto const &[env, con_man, store] = services_.template get<env_t, con_man_t, store_t>();
                 auto temp                         = env.get().parse_template(path_);
                 auto res                          = env.get().render(temp, store);
 
                 report(RequestEvent{ path_, store, inja::json::parse(res).dump(4) });
-                return con_man.get().send(std::move(res));
+                return con_man.get().request(std::move(res));
             } catch(std::exception const &e) {
                 auto const issues = std::vector<FailureEvent::Data>{
                     { FailureEvent::Data::Type::LOGIC_ERROR, path_, e.what() }
@@ -261,6 +261,7 @@ public:
         using con_man_t      = ConnectionManagerType;
         using reporting_t    = ReportEngineType;
         using flow_factory_t = FlowFactoryType;
+        using link_ptr_t     = typename con_man_t::link_ptr_t;
         using services_t     = di::Deps<env_t, store_t, con_man_t, reporting_t, flow_factory_t>;
 
         services_t services_;
@@ -282,16 +283,19 @@ public:
             for(uint32_t i = 0; i < repeat_; ++i) {
                 // todo: this should be a custom event
                 report(SimpleEvent{ "REPEAT", fmt::format("[{}] Running all steps in block", i + 1) });
-                std::string last_response_;
+                link_ptr_t connection_link;
 
                 // not sure i like that we essentially re-implemented both runner and Flow::load here
                 for(auto const &step : steps_) {
                     switch(step.type) {
                     case Step::Type::REQUEST:
-                        last_response_ = RequestStep{ services_, path_ / step.file }.perform();
+                        connection_link = RequestStep{ services_, path_ / step.file }.perform();
                         break;
                     case Step::Type::RESPONSE:
-                        ResponseStep{ services_, path_ / step.file }.validate(inja::json::parse(last_response_));
+                        if(not connection_link)
+                            throw std::logic_error{ "Response can't come before Request step" };
+                        ResponseStep{ services_, path_ / step.file }.validate(
+                            inja::json::parse(connection_link->read_one()));
                         break;
                     case Step::Type::RUN_FLOW:
                         RunFlowStep{ services_, path_.parent_path().parent_path() / step.name }.run();

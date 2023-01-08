@@ -11,7 +11,7 @@
 using rep_renderer_t = DefaultReportRenderer;
 using reporting_t    = ReportEngine<rep_renderer_t>;
 using fetcher_t      = OnDemandFetcher;
-using con_man_t      = ConnectionManager<OnDemandConnection, fetcher_t>;
+using con_man_t      = ConnectionManager<AsyncConnectionPool, fetcher_t>;
 using flow_factory_t = DefaultFlowFactory<con_man_t, reporting_t>;
 using crawler_t      = Crawler<reporting_t>;
 using scheduler_t    = Scheduler<flow_factory_t, con_man_t, reporting_t, crawler_t>;
