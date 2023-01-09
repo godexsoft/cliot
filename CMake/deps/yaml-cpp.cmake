@@ -10,4 +10,4 @@ if(NOT yamlcpp_POPULATED)
   add_subdirectory(${yamlcpp_SOURCE_DIR} ${yamlcpp_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 
-target_link_libraries(cliot PRIVATE yaml-cpp)
+target_link_libraries(lib_cliot PUBLIC yaml-cpp)

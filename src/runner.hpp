@@ -12,10 +12,9 @@
 #include <string_view>
 #include <vector>
 
-#include <events.hpp>
-#include <flow.hpp>
-#include <reporting.hpp>
-#include <web.hpp>
+#include <flow/flow.hpp>
+#include <reporting/events.hpp>
+#include <reporting/report_engine.hpp>
 
 template <class... Ts>
 struct overloaded : Ts... {

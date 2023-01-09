@@ -1,7 +1,7 @@
 #pragma once
 
 #include <crawler.hpp>
-#include <reporting.hpp>
+#include <reporting/report_engine.hpp>
 #include <runner.hpp>
 
 #include <di.hpp>

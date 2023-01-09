@@ -11,4 +11,4 @@ if(NOT di_POPULATED)
   add_subdirectory(${di_SOURCE_DIR} ${di_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 
-target_link_libraries(cliot PRIVATE di)
+target_link_libraries(lib_cliot PUBLIC di)

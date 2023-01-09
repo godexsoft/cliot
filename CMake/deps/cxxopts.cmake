@@ -10,4 +10,4 @@ if(NOT cxxopts_POPULATED)
   add_subdirectory(${cxxopts_SOURCE_DIR} ${cxxopts_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 
-target_link_libraries(cliot PRIVATE cxxopts)
+target_link_libraries(lib_cliot PUBLIC cxxopts)

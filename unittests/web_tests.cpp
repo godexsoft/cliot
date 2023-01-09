@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
-#include <web.hpp>
+#include <web/async_connection_pool.hpp>
+#include <web/connection_manager.hpp>
 
 struct MockHandler {
     std::string host;

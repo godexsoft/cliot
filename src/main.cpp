@@ -1,8 +1,13 @@
 #include <crawler.hpp>
-#include <reporting.hpp>
+#include <flow/default_flow_factory.hpp>
+#include <reporting/default_report_renderer.hpp>
+#include <reporting/report_engine.hpp>
 #include <runner.hpp>
 #include <scheduler.hpp>
-#include <validation.hpp>
+#include <validation/validator.hpp>
+#include <web/async_connection_pool.hpp>
+#include <web/connection_manager.hpp>
+#include <web/fetcher.hpp>
 
 #include <cxxopts.hpp>
 #include <di.hpp>

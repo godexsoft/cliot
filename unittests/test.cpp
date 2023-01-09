@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <flow.hpp>
+#include <flow/flow.hpp>
 
 #include <fmt/color.h>
 #include <fmt/compile.h>

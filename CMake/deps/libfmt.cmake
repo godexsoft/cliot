@@ -10,4 +10,4 @@ if(NOT libfmt_POPULATED)
   add_subdirectory(${libfmt_SOURCE_DIR} ${libfmt_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 
-target_link_libraries(cliot PRIVATE fmt)
+target_link_libraries(lib_cliot PUBLIC fmt)

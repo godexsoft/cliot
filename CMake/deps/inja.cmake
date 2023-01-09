@@ -10,4 +10,4 @@ if(NOT inja_POPULATED)
   add_subdirectory(${inja_SOURCE_DIR} ${inja_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 
-target_link_libraries(cliot PRIVATE inja)
+target_link_libraries(lib_cliot PUBLIC inja)
