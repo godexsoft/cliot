@@ -9,7 +9,7 @@ metadata:
   - First version
 steps:
 - type: block
-  repeat: 100 # repeat steps 100 times
+  repeat: 10 # repeat steps 10 times
   steps:
   - type: request
     file: request.json.j2

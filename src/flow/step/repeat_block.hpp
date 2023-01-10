@@ -1,9 +1,7 @@
 #pragma once
 
 #include <flow/exceptions.hpp>
-#include <flow/yaml_conversion.hpp>
-#include <reporting/events.hpp> // probably should not be here, should use report engine public member func instead
-#include <util/overloaded.hpp>
+#include <runner.hpp>
 
 #include <di.hpp>
 #include <fmt/compile.h>
@@ -15,21 +13,24 @@
 
 namespace step {
 
-template <typename ServicesType, typename ConnectionLinkType, typename ReportEngineType, typename RequestStepType, typename ResponseStepType, typename RunFlowStepType>
+template <typename EnvType, typename StoreType, typename ConnectionManagerType, typename ReportEngineType, typename FlowFactoryType>
 class RepeatBlock {
-    using services_t  = ServicesType;
-    using link_ptr_t  = ConnectionLinkType;
-    using reporting_t = ReportEngineType;
+    using env_t          = EnvType;
+    using store_t        = StoreType;
+    using con_man_t      = ConnectionManagerType;
+    using reporting_t    = ReportEngineType;
+    using flow_factory_t = FlowFactoryType;
+    using services_t     = di::Deps<env_t, store_t, con_man_t, reporting_t, flow_factory_t>;
 
     services_t services_;
-    std::filesystem::path path_;
+    std::string path_;
     uint32_t repeat_;
     std::vector<descriptor::Step> steps_;
 
 public:
     RepeatBlock(services_t services, std::filesystem::path const &path, uint32_t repeat, std::vector<descriptor::Step> const &steps)
         : services_{ services }
-        , path_{ path }
+        , path_{ path.string() }
         , repeat_{ repeat }
         , steps_{ steps } { }
 
@@ -38,39 +39,21 @@ public:
 
     void run() {
         for(uint32_t i = 0; i < repeat_; ++i) {
-            // todo: this should be a custom event
-            report(SimpleEvent{ "REPEAT", fmt::format("[{}] Running all steps in block", i + 1) });
-            link_ptr_t connection_link;
-
-            // not sure i like that we essentially re-implemented both runner and Flow::load here
-            for(auto const &step : steps_) {
-                // clang-format off
-                std::visit( overloaded {
-                    [this, &connection_link](descriptor::Request const &req) {
-                        connection_link = RequestStepType{ services_, path_ / req.file }.perform();
-                    },
-                    [this, &connection_link](descriptor::Response const &resp) {
-                        if(not connection_link)
-                            throw std::logic_error{ "Response can't come before Request step" };
-                        ResponseStepType{ services_, path_ / resp.file }.validate(
-                            inja::json::parse(connection_link->read_one())); // inja::json parser should be injected thru services instead
-                    },
-                    [this](descriptor::RunFlow const &flow) {
-                        RunFlowStepType{ services_, path_.parent_path().parent_path() / flow.name }.run();
-                    },
-                    [this](descriptor::RepeatBlock const &block) {
-                        RepeatBlock{ services_, path_, block.repeat, block.steps }.run();
-                    }},
-                step);
-                // clang-format on
+            try {
+                auto const &[env, store, factory] = services_.template get<env_t, store_t, flow_factory_t>();
+                auto flow                         = factory.get().make(path_, steps_, env, store);
+                auto runner                       = FlowRunner<flow_factory_t>{
+                    services_, fmt::format("block[{}]", i + 1), path_
+                };
+                runner.run(env.get(), store.get(), flow);
+            } catch(FlowException const &e) {
+                auto issues = std::vector<FailureEvent::Data>{
+                    { FailureEvent::Data::Type::LOGIC_ERROR, path_, "Block execution failed" }
+                };
+                issues.insert(std::begin(issues), std::begin(e.issues), std::end(e.issues));
+                throw FlowException(path_, issues, "No data");
             }
         }
-    }
-
-private:
-    void report(auto &&ev) {
-        auto const &reporting = services_.template get<reporting_t>();
-        reporting.get().record(std::move(ev));
     }
 };
 

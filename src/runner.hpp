@@ -54,10 +54,14 @@ public:
     }
 
     void run(env_t &env, store_t &store) {
-        report("RUNNING", name_);
-
         auto const &factory  = services_.template get<flow_factory_t>();
         auto flow            = factory.get().make(path_, env, store);
+        auto connection_link = link_ptr_t{};
+        run(env, store, flow);
+    }
+
+    void run(env_t &env, store_t &store, auto const &flow) {
+        report("RUNNING", name_);
         auto connection_link = link_ptr_t{};
 
         for(auto steps = flow.steps(); auto &step : steps) {

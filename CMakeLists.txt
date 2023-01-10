@@ -34,6 +34,7 @@ target_sources(lib_cliot PUBLIC
   src/web/fetcher.cpp
   src/reporting/default_report_renderer.cpp
   src/validation/validator.cpp
+  src/flow/impl/yaml_file_loader.cpp
   src/util/parse_uri.cpp
 )
 

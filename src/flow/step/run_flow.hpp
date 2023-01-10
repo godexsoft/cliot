@@ -2,6 +2,7 @@
 
 #include <flow/exceptions.hpp>
 #include <reporting/events.hpp> // probably should not be here, should use report engine public member func instead
+#include <runner.hpp>
 
 #include <di.hpp>
 #include <fmt/compile.h>

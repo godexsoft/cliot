@@ -2,7 +2,6 @@
 
 #include <flow/descriptors.hpp>
 #include <flow/exceptions.hpp>
-#include <flow/yaml_conversion.hpp>
 #include <reporting/events.hpp>
 #include <runner.hpp>
 #include <util/overloaded.hpp>
@@ -43,52 +42,45 @@ public:
     using request_step_t      = step::Request<env_t, store_t, ConnectionManagerType, ReportEngineType>;
     using response_step_t     = step::Response<env_t, store_t, ConnectionManagerType, ReportEngineType, ValidatorType, inja::InjaError, inja::json::exception>;
     using run_flow_step_t     = step::RunFlow<env_t, store_t, ConnectionManagerType, ReportEngineType, FlowFactoryType>;
-    using repeat_block_step_t = step::RepeatBlock<services_t, connection_link_t, reporting_t, request_step_t, response_step_t, run_flow_step_t>;
+    using repeat_block_step_t = step::RepeatBlock<env_t, store_t, ConnectionManagerType, ReportEngineType, FlowFactoryType>;
 
     using step_t = std::variant<request_step_t, response_step_t, run_flow_step_t, repeat_block_step_t>;
 
 private:
     services_t services_;
-
-    std::filesystem::path path_;
     std::vector<step_t> steps_;
 
 public:
-    explicit Flow(services_t services, std::filesystem::path const &path)
+    template <typename Loader>
+    explicit Flow(services_t services, Loader const &loader)
         : services_{ services }
-        , path_{ path } {
-        assert(std::filesystem::is_directory(path));
-        load();
-    }
+        , steps_{ load_from(loader.load(), loader.base_path()) } { }
 
     std::vector<step_t> const &steps() const {
         return steps_;
     }
 
 private:
-    // todo: the actual implementation (yaml) should be a strategy injected via services_t
-    void load() {
-        auto script_path = path_ / "script.yaml";
-        assert(std::filesystem::exists(script_path));
-        YAML::Node doc = YAML::LoadFile(script_path.string());
-
-        for(auto const &step : doc["steps"].as<std::vector<descriptor::Step>>()) {
+    std::vector<step_t> load_from(std::vector<descriptor::Step> const &descriptors, std::filesystem::path const &base_path) {
+        std::vector<step_t> steps;
+        for(auto const &step : descriptors) {
             // clang-format off
             std::visit( overloaded {
-                [this](descriptor::Request const &req) {
-                    steps_.push_back(request_step_t{ services_, path_ / req.file });
+                [this, &steps, &base_path](descriptor::Request const &req) {
+                    steps.push_back(request_step_t{ services_, base_path / req.file });
                 },
-                [this](descriptor::Response const &resp) {
-                    steps_.push_back(response_step_t{ services_, path_ / resp.file });
+                [this, &steps, &base_path](descriptor::Response const &resp) {
+                    steps.push_back(response_step_t{ services_, base_path / resp.file });
                 },
-                [this](descriptor::RunFlow const &flow) {
-                    steps_.push_back(run_flow_step_t{ services_, path_.parent_path().parent_path() / flow.name });
+                [this, &steps, &base_path](descriptor::RunFlow const &flow) {
+                    steps.push_back(run_flow_step_t{ services_, base_path.parent_path().parent_path() / flow.name });
                 },
-                [this](descriptor::RepeatBlock const &block) {
-                    steps_.push_back(repeat_block_step_t{ services_, path_, block.repeat, block.steps });
+                [this, &steps, &base_path](descriptor::RepeatBlock const &block) {
+                    steps.push_back(repeat_block_step_t{ services_, base_path, block.repeat, block.steps });
                 }},
             step);
             // clang-format on
         }
+        return steps;
     }
 };
