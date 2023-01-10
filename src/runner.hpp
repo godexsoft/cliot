@@ -15,13 +15,7 @@
 #include <flow/flow.hpp>
 #include <reporting/events.hpp>
 #include <reporting/report_engine.hpp>
-
-template <class... Ts>
-struct overloaded : Ts... {
-    using Ts::operator()...;
-};
-template <class... Ts>
-overloaded(Ts...) -> overloaded<Ts...>;
+#include <util/overloaded.hpp>
 
 template <typename FlowFactoryType>
 class FlowRunner {

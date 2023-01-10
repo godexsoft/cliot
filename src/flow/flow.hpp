@@ -1,5 +1,18 @@
 #pragma once
 
+#include <flow/descriptors.hpp>
+#include <flow/exceptions.hpp>
+#include <flow/yaml_conversion.hpp>
+#include <reporting/events.hpp>
+#include <runner.hpp>
+#include <util/overloaded.hpp>
+#include <validation/validator.hpp>
+
+#include <flow/step/repeat_block.hpp>
+#include <flow/step/request.hpp>
+#include <flow/step/response.hpp>
+#include <flow/step/run_flow.hpp>
+
 #include <di.hpp>
 #include <fmt/color.h>
 #include <fmt/compile.h>
@@ -11,18 +24,8 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <variant>
 #include <vector>
-
-#include <flow/exceptions.hpp>
-#include <flow/yaml_conversion.hpp>
-#include <reporting/events.hpp>
-#include <runner.hpp>
-#include <validation/validator.hpp>
-
-#include <flow/step/repeat_block.hpp>
-#include <flow/step/request.hpp>
-#include <flow/step/response.hpp>
-#include <flow/step/run_flow.hpp>
 
 template <typename ConnectionManagerType, typename ReportEngineType, typename ValidatorType, typename FlowFactoryType>
 class Flow {
@@ -63,28 +66,29 @@ public:
     }
 
 private:
+    // todo: the actual implementation (yaml) should be a strategy injected via services_t
     void load() {
         auto script_path = path_ / "script.yaml";
         assert(std::filesystem::exists(script_path));
         YAML::Node doc = YAML::LoadFile(script_path.string());
 
-        for(auto const &step : doc["steps"].as<std::vector<Step>>()) {
-            switch(step.type) {
-            case Step::Type::REQUEST:
-                steps_.push_back(request_step_t{ services_, path_ / step.file });
-                break;
-            case Step::Type::RESPONSE:
-                steps_.push_back(response_step_t{ services_, path_ / step.file });
-                break;
-            case Step::Type::RUN_FLOW:
-                steps_.push_back(run_flow_step_t{ services_, path_.parent_path().parent_path() / step.name });
-                break;
-            case Step::Type::REPEAT_BLOCK:
-                steps_.push_back(repeat_block_step_t{ services_, path_, step.repeat.value_or(1), step.steps.value() });
-                break;
-            default:
-                break;
-            }
+        for(auto const &step : doc["steps"].as<std::vector<descriptor::Step>>()) {
+            // clang-format off
+            std::visit( overloaded {
+                [this](descriptor::Request const &req) {
+                    steps_.push_back(request_step_t{ services_, path_ / req.file });
+                },
+                [this](descriptor::Response const &resp) {
+                    steps_.push_back(response_step_t{ services_, path_ / resp.file });
+                },
+                [this](descriptor::RunFlow const &flow) {
+                    steps_.push_back(run_flow_step_t{ services_, path_.parent_path().parent_path() / flow.name });
+                },
+                [this](descriptor::RepeatBlock const &block) {
+                    steps_.push_back(repeat_block_step_t{ services_, path_, block.repeat, block.steps });
+                }},
+            step);
+            // clang-format on
         }
     }
 };

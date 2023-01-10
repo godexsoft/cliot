@@ -132,8 +132,8 @@ Example:
 #### Type checking
 
 Your response templates can contain arbitrary JSON. If an actual value is specified (other than empty object), Cliot will compare by equality.
-However, sometimes we don't care about the actual value and are only want to verify that a certain field is of a certain type.
-This can easily be achieved with the build in type checking facilities. Example response template:
+However, sometimes we don't care about the actual value and only want to verify that a certain field is of a certain type.
+This can easily be achieved with the built-in type checking facilities. Example response template:
 
 ```json
 {
@@ -158,5 +158,6 @@ All type checking filters:
 
 - Support both websocket and normal HTTP requests (currently only websocket)
 - Ability to define one request template for both WS and HTTP APIs (clio/rippled have slightly different formats for ws vs. http) 
-- Pooled asynchronous WS connections (currently using fully synchronous, on-demand connections)
-- Support testing subscriptions (where not only one WS can respond with multiple messages to one request, but also some actions need to happen while subscription is active)
+- Some way to parallelize certain steps (could be needed for testing subscriptions, e.g. performing some actions to trigger events)
+- A delay step that just introduces an artificial delay between other steps
+- Cover most/all of the code with unit-tests
