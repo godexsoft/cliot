@@ -34,12 +34,12 @@ public:
         , filter_{ filter } { }
 
     auto crawl() {
-        auto path = path_ / "flows";
+        auto flows_path = path_ / "flows";
 
-        if(not std::filesystem::exists(path))
+        if(not std::filesystem::exists(flows_path))
             throw std::runtime_error("given path does not appear to be valid: missing 'flows' sub directory");
 
-        for(auto const &entry : std::filesystem::directory_iterator{ path }) {
+        for(auto const &entry : std::filesystem::directory_iterator{ flows_path }) {
             crawl(entry.path());
         }
 
