@@ -34,6 +34,11 @@ void Validator::do_validate(std::string path, inja::json const &expectations, in
                 return incoming.is_boolean();
             } else if(val == "$string") {
                 return incoming.is_string();
+            } else if(val.starts_with("$array=")) {
+                // FIXME: this is a bit of a hack but don't really care atm
+                const auto num        = val.substr(7, val.size() - 7);
+                std::size_t const len = atoi(num.c_str());
+                return incoming.is_array() && incoming.size() == len;
             } else if(val == "$array") {
                 return incoming.is_array();
             } else if(val == "$double") {
