@@ -86,22 +86,57 @@ Other than what `inja` already supports Cliot is adding the following extensions
 
 ##### store
 
-Used to store a value from the environment under a different key in the same environment while returning the value.
+Used to store a value from the environment under a different key in the same environment.
 Example `response.json.j2`:
-
 ```jinja
-{"version": "{{ store($res.version, "VERSION") }}"}
+{{ store($res.version, "VERSION") }}
 ```
 
 Now we supposed to have whatever the response had under `version` key stored under the `VERSION` key.
 In later requests within the same flow (or subflows) we can refer to it like `{{ VERSION }}` inside the `json.j2` templates.
 
-Other than that, `store` will return the value which will end up generating the following JSON (assuming version was `1.0.2`) to validate against:
+##### storeAndReturn
+
+Used to store a value from the environment under a different key in the same environment while returning the value.
+Example `response.json.j2`:
+```jinja
+{"version": "{{ store($res.version, "VERSION") }}"}
+```
+
+`storeAndReturn` will return the value which will end up generating the following JSON (assuming version was `1.0.2`) to validate against:
 ```json
 {"version": "1.0.3"}
 ```
 
 This of course validates fine because the strings are simply compared for equality.
+
+##### load
+
+Used to load a value that is stored in the environment.
+Example `response.json.j2`:
+```jinja
+{{ load("VERSION") }}
+```
+
+##### combine
+
+Can be used to combine two JSON arrays into one.
+Example `response.json.j2`:
+```jinja
+{{ 
+  store(combine(load("arr1"), load("arr2)), "combined")
+}}
+```
+
+##### equal
+
+Compare two values for equality. Returns `true` or `false`.
+Example `response.json.j2`:
+```jinja
+{{ 
+  equal(load("combined"), $res.results.some_arr_in_results)
+}}
+```
 
 ##### fetch_json
 
@@ -127,6 +162,16 @@ Example:
 
 ```jinja
 {% report("Test response [some.response.path]: " + $res.some.response.path) %}
+```
+
+##### assert
+
+Asserts and throws a logic error with the provided message if assertion fails.
+Example `response.json.j2`:
+```jinja
+{{ 
+  assert(equal(load("arr1"), load("arr2)), "Arrays are not equal")
+}}
 ```
 
 #### Type checking
