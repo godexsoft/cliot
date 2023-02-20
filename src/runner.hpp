@@ -99,14 +99,50 @@ private:
     }
 
     void register_extensions(env_t &env, store_t &store) {
-        auto store_cb = [&store](inja::Arguments &args) {
+        auto store_and_return_cb = [&store](inja::Arguments &args) {
             auto value = args.at(0)->get<inja::json>();
             auto var   = args.at(1)->get<std::string>();
 
             store[var] = value;
             return value;
         };
-        env.add_callback("store", 2, store_cb);
+        env.add_callback("storeAndReturn", 2, store_and_return_cb);
+
+        auto store_cb = [&store](inja::Arguments &args) {
+            auto value = args.at(0)->get<inja::json>();
+            auto var   = args.at(1)->get<std::string>();
+            store[var] = value;
+        };
+        env.add_void_callback("store", 2, store_cb);
+
+        auto combine_cb = [](inja::Arguments &args) {
+            auto value1 = args.at(0)->get<inja::json>();
+            auto value2 = args.at(1)->get<inja::json>();
+            value1.insert(value1.end(), value2.begin(), value2.end());
+            return value1;
+        };
+        env.add_callback("combine", 2, combine_cb);
+
+        auto equal_cb = [](inja::Arguments &args) {
+            auto value1 = args.at(0)->get<inja::json>();
+            auto value2 = args.at(1)->get<inja::json>();
+            return value1 == value2;
+        };
+        env.add_callback("equal", 2, equal_cb);
+
+        auto load_cb = [&store](inja::Arguments &args) {
+            auto var = args.at(0)->get<std::string>();
+            return store[var];
+        };
+        env.add_callback("load", 1, load_cb);
+
+        auto assert_cb = [](inja::Arguments &args) {
+            auto const value = args.at(0)->get<bool>();
+            auto const msg   = args.at(1)->get<std::string>();
+            if(!value)
+                throw std::logic_error(msg);
+        };
+        env.add_void_callback("assert", 2, assert_cb);
 
         auto report_cb = [this](inja::Arguments &args) {
             auto const &reporting = services_.template get<reporting_t>();

@@ -1,10 +1,17 @@
 {
     "result": {
-        "account": "rpakCr61Q92abPXJnVboKENmpKssWyHpwu",
-        "account_objects": "$array=100",
+        "account": "{{ account }}",
+        "account_objects": "$array={{ combined_limit }}",
         "marker": "$string",
         "validated": true
     },
     "status": "success",
     "type": "response"
 }
+{{ 
+    assert(
+        equal(
+            combine(load("FirstObjects"), load("SecondObjects")), 
+            $res.result.account_objects ), 
+        "Full account_objects don't match combination of first and second parts") 
+}}

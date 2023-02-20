@@ -1,7 +1,7 @@
 {
     "result": {
-        "ledger_index_max": {{ store($res.result.ledger_index_max, "LedgerIndexMax") }},
-        "ledger_index_min": {{ store($res.result.ledger_index_min, "LedgerIndexMin") }},
+        "ledger_index_max": {{ storeAndReturn($res.result.ledger_index_max, "LedgerIndexMax") }},
+        "ledger_index_min": {{ storeAndReturn($res.result.ledger_index_min, "LedgerIndexMin") }},
         "validated": true
     },
     "status": "success",

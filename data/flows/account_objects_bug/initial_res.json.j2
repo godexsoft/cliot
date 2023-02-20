@@ -1,10 +1,11 @@
 {
     "result": {
         "account": "rpakCr61Q92abPXJnVboKENmpKssWyHpwu",
-        "account_objects": "$array=40",
-        "marker": "{{ store($res.result.marker, "Marker") }}", 
+        "account_objects": "$array={{ first_limit }}",
+        "marker": "{{ storeAndReturn($res.result.marker, "Marker") }}", 
         "validated": true
     },
     "status": "success",
     "type": "response"
 }
+{{ store($res.result.account_objects, "FirstObjects") }}

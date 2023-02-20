@@ -1,8 +1,9 @@
 {
     "result": {
-        "account": "rpakCr61Q92abPXJnVboKENmpKssWyHpwu",
-        "account_objects": "$array=40",
+        "account": "{{ account }}",
+        "account_objects": "$array={{ first_limit }}",
         "validated": true
     },
     "status": "success"
 }
+{{ store($res.result.account_objects, "SecondObjects") }}

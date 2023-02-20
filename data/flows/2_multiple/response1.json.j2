@@ -19,7 +19,7 @@
         }
       },
       "load_factor": 1,
-      "clio_version": "{{ store($res.result.info.clio_version, "ClioVersion") }}",
+      "clio_version": "{{ storeAndReturn($res.result.info.clio_version, "ClioVersion") }}",
       "validated_ledger": {
       },
       "cache": {
