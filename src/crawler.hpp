@@ -60,10 +60,13 @@ public:
 private:
     void crawl(std::filesystem::path flow_path) {
         auto flow_name = flow_path.filename().string();
+        if(flow_name.starts_with("."))
+            return;
+
         report_detected(flow_name);
 
         for(auto const &entry : std::filesystem::directory_iterator{ flow_path }) {
-            if(not entry.is_regular_file())
+            if(not entry.is_regular_file() or entry.path().filename().string().starts_with("."))
                 continue;
 
             paths_.emplace(flow_name, entry.path());
