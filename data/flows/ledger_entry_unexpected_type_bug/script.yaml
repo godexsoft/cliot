@@ -1,0 +1,38 @@
+---
+metadata:
+  subject: Bug with ledger entry ticket
+  description: This is an example request-response flow
+  author: Cindy
+  created_on: 28 Feb 2023
+  last_update: 28 Feb 2023
+  revisions:
+    - First version
+steps:
+  - type: request
+    file: request_dir.json.j2
+  - type: response
+    file: response.json.j2
+  - type: request
+    file: request_escrow.json.j2
+  - type: response
+    file: response.json.j2
+  - type: request
+    file: request_offer.json.j2
+  - type: response
+    file: response.json.j2
+  - type: request
+    file: request_payment.json.j2
+  - type: response
+    file: response.json.j2
+  - type: request
+    file: request_check.json.j2
+  - type: response
+    file: response.json.j2
+  - type: request
+    file: request_deposit_preauth.json.j2
+  - type: response
+    file: response.json.j2
+  - type: request
+    file: request_ticket.json.j2
+  - type: response
+    file: response.json.j2
